@@ -1,0 +1,97 @@
+{
+    "name": "rdkit-structure-renderer",
+    "version": "1.0.6",
+    "description": "A JS library to render molecules as HTML5 Canvas or SVG using RDKit MinimalLib",
+    "main": "pkg/dist-src/index.js",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1",
+        "build": "npm run build:pkg && npm run build:prod",
+        "build:dev": "webpack --mode=development",
+        "build:prod": "webpack --mode=production --node-env=production",
+        "build:pkg": "pika build",
+        "lint": "eslint src",
+        "lint:fix": "eslint --fix --ext .js,.jsx .",
+        "watch": "webpack --watch",
+        "serve": "webpack serve"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/rdkit/rdkit-structure-renderer.git"
+    },
+    "keywords": [
+        "RDKit",
+        "structure",
+        "2D",
+        "layout",
+        "canvas",
+        "SVG"
+    ],
+    "author": "Novartis Institutes for BioMedical Research",
+    "license": "BSD-3-Clause",
+    "devDependencies": {
+        "@babel/core": "^7.17.5",
+        "@babel/plugin-transform-runtime": "^7.17.0",
+        "@babel/preset-env": "^7.16.11",
+        "@pika/pack": "^0.5.0",
+        "@pika/plugin-build-node": "^0.5.0",
+        "@pika/plugin-build-umd": "^0.5.0",
+        "@pika/plugin-build-web": "^0.5.0",
+        "@pika/plugin-bundle-node": "^0.5.0",
+        "@pika/plugin-bundle-web": "^0.5.0",
+        "@pika/plugin-copy-assets": "^0.5.0",
+        "@pika/plugin-standard-pkg": "^0.5.0",
+        "@webpack-cli/generators": "^2.4.2",
+        "babel-loader": "^8.2.3",
+        "eslint": "^8.10.0",
+        "eslint-webpack-plugin": "^3.1.1",
+        "html-webpack-plugin": "^5.5.0",
+        "prettier": "^2.5.1",
+        "webpack": "^5.69.1",
+        "webpack-cli": "^4.9.2",
+        "webpack-dev-server": "^4.7.4"
+    },
+    "babel": {
+        "presets": [
+            "@babel/preset-env"
+        ],
+        "plugins": [
+            [
+                "@babel/transform-runtime"
+            ]
+        ]
+    },
+    "@pika/pack": {
+        "pipeline": [
+            [
+                "@pika/plugin-standard-pkg",
+                {
+                    "exclude": [
+                        "**/__tests__/**",
+                        "**/*.stories.*"
+                    ]
+                }
+            ],
+            [
+                "@pika/plugin-build-node"
+            ],
+            [
+                "@pika/plugin-build-umd",
+                {
+                    "name": "epicUi"
+                }
+            ]
+        ]
+    },
+    "browserslist": {
+        "production": [
+            ">0.2%",
+            "not dead",
+            "not op_mini all"
+        ],
+        "development": [
+            "last 1 chrome version",
+            "last 1 firefox version",
+            "last 1 safari version"
+        ]
+    }
+}

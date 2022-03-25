@@ -34,7 +34,7 @@ const DEFAULT_DRAW_OPTS = {
     'backgroundColour': [1, 1, 1, 1]
 };
 
-const DIVID_PREFIX = 'rdk-str-rnr-mol-';
+const RDK_STR_RNR = 'rdk-str-rnr-';
 
 const DIVID_SEPARATOR = '___';
 
@@ -79,7 +79,7 @@ const WHL_OPTS = {
 
 export {
     DEFAULT_DRAW_OPTS,
-    DIVID_PREFIX,
+    RDK_STR_RNR,
     DIVID_SEPARATOR,
     DIV_ATTRS,
     BUTTON_TYPES,

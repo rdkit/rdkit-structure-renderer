@@ -44,7 +44,7 @@ import {
 } from './utils.js';
 import {
     DEFAULT_DRAW_OPTS,
-    DIVID_PREFIX,
+    RDK_STR_RNR,
     DIVID_SEPARATOR,
     DIV_ATTRS,
     BUTTON_TYPES,
@@ -148,7 +148,7 @@ const Renderer = {
      * Override to use a different divId prefix.
      * @returns {string} the divId prefix
      */
-    getDivIdPrefix: () => DIVID_PREFIX,
+    getDivIdPrefix: () => `${RDK_STR_RNR}mol-`,
 
     /**
      * Override to use a different separator in divId.
@@ -243,7 +243,7 @@ const Renderer = {
      */
     getButtonIcon: buttonType => {
         const div = document.createElement('div');
-        div.className = 'rdk-str-rnr-button-icon';
+        div.className = `${RDK_STR_RNR}button-icon`;
         div.innerHTML = defaultIcons[buttonType];
         return div;
     },
@@ -284,10 +284,12 @@ const Renderer = {
             return Promise.resolve(this);
         }
         if (!this._minimalLibJs) {
+            const RDK_CSS_ID = `${RDK_STR_RNR}css`;
             const _loadRendererCss = () => {
                 const rendererCss = this.getRendererCss();
                 const style = document.createElement('style');
                 const styleText = document.createTextNode(rendererCss);
+                style.id = RDK_CSS_ID;
                 style.setAttribute('type', 'text/css');
                 style.appendChild(styleText);
                 document.head.appendChild(style);
@@ -297,18 +299,24 @@ const Renderer = {
             }
             this._minimalLibPath = minimalLibPath.substring(0, minimalLibPath.lastIndexOf('/'));
             this._minimalLibJs = `${this._minimalLibPath}/RDKit_minimal.js`;
-            _loadRendererCss();
+            if (!document.getElementById(RDK_CSS_ID)) {
+                _loadRendererCss();
+            }
         }
         // if the RDKit module has already been initialzed, return it
         const _loadRDKitModule = (resolve) => {
             const TIMEOUT = 50;
+            const RDK_LOADER_ID = `${RDK_STR_RNR}loader`;
             if (typeof _RDKitModule === 'undefined') {
                 _RDKitModule = null;
-                const rdkitLoaderScript = document.createElement('script');
-                rdkitLoaderScript.src = this._minimalLibJs;
-                rdkitLoaderScript.async = true;
-                rdkitLoaderScript.onload = () => _loadRDKitModule(resolve);
-                document.head.appendChild(rdkitLoaderScript);
+                if (!document.getElementById(RDK_LOADER_ID)) {
+                    const rdkitLoaderScript = document.createElement('script');
+                    rdkitLoaderScript.id = RDK_LOADER_ID;
+                    rdkitLoaderScript.src = this._minimalLibJs;
+                    rdkitLoaderScript.async = true;
+                    rdkitLoaderScript.onload = () => _loadRDKitModule(resolve);
+                    document.head.appendChild(rdkitLoaderScript);
+                }
             }
             if (window.initRDKitModule || _RDKitModule) {
                 let res = this;
@@ -343,7 +351,7 @@ const Renderer = {
     },
 
     /**
-     * Get the divId from a div, removing, if present, DIVID_PREFIX
+     * Get the divId from a div, removing, if present, the divId prefix
      * @param {Element} div molDiv
      * @returns {string} divId
      */
@@ -356,7 +364,7 @@ const Renderer = {
 
     /**
      * Get the cacheKey from a div or divId, removing, if present,
-     * DIVID_PREFIX and,if present, the uniqueId before the ___ separator
+     * the divId prefix and, if present, the uniqueId before the ___ separator
      * @param {Element|string} div molDiv
      * @returns {string} cacheKey
      */
@@ -1223,7 +1231,7 @@ const Renderer = {
     createSpinner: function(div) {
         if (!this.spinner) {
             const spinner = document.createElement('div');
-            spinner.className = 'rdk-str-rnr-spinner';
+            spinner.className = `${RDK_STR_RNR}spinner`;
             const spinnerWhl = document.createElement('div');
             spinnerWhl.className = 'whl';
             spinner.appendChild(spinnerWhl);
@@ -1261,7 +1269,7 @@ const Renderer = {
         if (!this.svgDiv) {
             const svgDiv = document.createElement('div');
             svgDiv.setAttribute('name', 'mol-draw');
-            svgDiv.className = 'rdk-str-rnr-mol-draw';
+            svgDiv.className = `${RDK_STR_RNR}mol-draw`;
             svgDiv.appendChild(document.createTextNode(' '));
             this.svgDiv = svgDiv;
         }

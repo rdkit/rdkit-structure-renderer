@@ -30,40 +30,42 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
+import { RDK_STR_RNR } from './constants.js';
+
 const html =
-`<div class="rdk-str-rnr-dialog">
-    <label class="rdk-str-rnr-title">Structure Renderer Options</label>
-    <div class="rdk-str-rnr-formats">
-        <label class="label chevron-label" id="rdk-str-rnr-formats-label">Formats</label>
-        <input type="checkbox" id="rdk-str-rnr-formats-input"/>
-        <span class="chevron collapsed" id="rdk-str-rnr-formats-collapsed"></span>
-        <span class="chevron expanded" id="rdk-str-rnr-formats-expanded"></span>
+`<div class="${RDK_STR_RNR}dialog">
+    <label class="${RDK_STR_RNR}title">Structure Renderer Options</label>
+    <div class="${RDK_STR_RNR}formats">
+        <label class="label chevron-label" id="${RDK_STR_RNR}formats-label">Formats</label>
+        <input type="checkbox" id="${RDK_STR_RNR}formats-input"/>
+        <span class="chevron collapsed" id="${RDK_STR_RNR}formats-collapsed"></span>
+        <span class="chevron expanded" id="${RDK_STR_RNR}formats-expanded"></span>
         <div></div>
         <label class="label">SMILES
-            <button type="button" class="copy" id="rdk-str-rnr-copy-smiles"></button>
+            <button type="button" class="copy" id="${RDK_STR_RNR}copy-smiles"></button>
         </label>
-        <textarea class="box smilesinchi" id="rdk-str-rnr-content-smiles" readonly="true" wrap="hard">&nbsp;</textarea>
+        <textarea class="box smilesinchi" id="${RDK_STR_RNR}content-smiles" readonly="true" wrap="hard">&nbsp;</textarea>
         <div></div>
         <label class="label">Molblock
-            <button type="button" class="copy" id="rdk-str-rnr-copy-molblock"></button>
+            <button type="button" class="copy" id="${RDK_STR_RNR}copy-molblock"></button>
         </label>
-        <textarea class="box molblock" id="rdk-str-rnr-content-molblock" readonly="true" wrap="off">&nbsp;</textarea>
+        <textarea class="box molblock" id="${RDK_STR_RNR}content-molblock" readonly="true" wrap="off">&nbsp;</textarea>
         <div></div>
         <label class="label">InChI
-            <button type="button" class="copy" id="rdk-str-rnr-copy-inchi"></button>
+            <button type="button" class="copy" id="${RDK_STR_RNR}copy-inchi"></button>
         </label>
-        <textarea class="box smilesinchi" id="rdk-str-rnr-content-inchi" readonly="true" wrap="hard">&nbsp;</textarea>
+        <textarea class="box smilesinchi" id="${RDK_STR_RNR}content-inchi" readonly="true" wrap="hard">&nbsp;</textarea>
         <div></div>
         <table class="table">
             <tr>
                 <td class="fmtcell"><label class="label">PNG
-                    <button type="button" class="copy" id="rdk-str-rnr-copy-png"></button>
+                    <button type="button" class="copy" id="${RDK_STR_RNR}copy-png"></button>
                 </label></td>
                 <td class="fmtcell"><label class="label">SVG
-                    <button type="button" class="copy" id="rdk-str-rnr-copy-svg"></button>
+                    <button type="button" class="copy" id="${RDK_STR_RNR}copy-svg"></button>
                 </label></td>
                 <td class="scalecell"><span class="label">&times;</span>
-                    <input class="scale" type="number" id="rdk-str-rnr-scalefac" value="1" min="1" max="9" step="1"/></td>
+                    <input class="scale" type="number" id="${RDK_STR_RNR}scalefac" value="1" min="1" max="9" step="1"/></td>
             </tr>
         </table>
     </div>

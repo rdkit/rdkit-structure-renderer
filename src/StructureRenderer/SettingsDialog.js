@@ -30,13 +30,15 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
+import { RDK_STR_RNR } from './constants.js';
+
 /**
  * SettingsDialog class:
  * Creates a dialog that allows the user to:
  * - customize the appearance of a molecule
  * - copy the molecule to the clipboard in different formats
  */
- class SettingsDialog {
+class SettingsDialog {
     /**
      * Constructor.
      * @param  {RDKitStructureRenderer} renderer
@@ -233,17 +235,17 @@
         this.dialogOuter.innerHTML = this.renderer.getDialogHtml();
         this.dialog = this.dialogOuter.firstElementChild;
         this.coordDependentCopyButtons = ['molblock', 'png', 'svg'];
-        const formats = this.dialog.querySelector('div[class=rdk-str-rnr-formats]');
+        const formats = this.dialog.querySelector(`div[class=${RDK_STR_RNR}formats]`);
         this.renderOpt = {};
         // dynamically create a checkbox and the relative label
         // for each user setting in USER_OPTS
         this.renderer.getCheckableUserOpts().forEach(({ tag, text }) => {
             const label = document.createElement('label');
-            label.className = 'rdk-str-rnr-checkbox';
+            label.className = `${RDK_STR_RNR}checkbox`;
             label.appendChild(document.createTextNode(text));
             const checkbox = document.createElement('input');
             checkbox.type = 'checkbox';
-            checkbox.id = `rdk-str-rnr-checkbox-${tag}`;
+            checkbox.id = `${RDK_STR_RNR}checkbox-${tag}`;
             checkbox.onclick = () => this.onRenderingChanged(tag);
             this.renderOpt[tag] = checkbox;
             label.appendChild(checkbox);
@@ -254,12 +256,12 @@
             });
             this.dialog.insertBefore(label, formats);
         });
-        this.isExpanded = this.dialog.querySelector('input[id=rdk-str-rnr-formats-input]');
+        this.isExpanded = this.dialog.querySelector(`input[id=${RDK_STR_RNR}formats-input]`);
         this.onCopy = this.onCopy.bind(this);
         this.setPosition = this.setPosition.bind(this);
         this.hideOnClick = this.hideOnClick.bind(this);
         const textArea = Object.fromEntries(Array.from(this.dialog.querySelectorAll(
-            'textarea[id^=rdk-str-rnr-content-')).map(elem => [this.getIdVariant(elem.id), elem]));
+            `textarea[id^=${RDK_STR_RNR}content-`)).map(elem => [this.getIdVariant(elem.id), elem]));
         const spinnerOuter = document.createElement('div');
         spinnerOuter.className = 'spinner';
         const spinner = document.createElement('div');
@@ -270,18 +272,18 @@
         molblockTextArea.parentNode.insertBefore(spinnerOuter, molblockTextArea);
         this.textArea = textArea;
         this.copyFormat = {};
-        this.dialog.querySelectorAll('button[id^=rdk-str-rnr-copy-').forEach(
+        this.dialog.querySelectorAll(`button[id^=${RDK_STR_RNR}copy-`).forEach(
             button => {
                 button.appendChild(this.renderer.getButtonIcon('copy'));
                 const field = this.getIdVariant(button.id);
                 this.copyFormat[field] = button;
                 button.onclick = () => this.onCopy(field);
             });
-        const scaleInput = this.dialog.querySelector('input[id^=rdk-str-rnr-scalefac');
+        const scaleInput = this.dialog.querySelector(`input[id^=${RDK_STR_RNR}scalefac`);
         if (scaleInput) {
             scaleInput.onchange = (e) => this.renderer.copyImgScaleFac = e.target.value;
         }
-        this.dialog.querySelectorAll('[id^=rdk-str-rnr-formats-]').forEach(
+        this.dialog.querySelectorAll(`[id^=${RDK_STR_RNR}formats-]`).forEach(
             elem => elem.onclick = () => this.isExpanded.checked = !this.isExpanded.checked);
     }
 
@@ -427,6 +429,18 @@
             x: Math.round(cogRect.left + 0.5 * cogRect.width),
             y: Math.round(cogRect.top + 0.5 * cogRect.height),
         };
+        const dialogRect = this.dialog.getBoundingClientRect();
+        if (!this._initialDialogRect) {
+            this._initialDialogRect = {
+                height: dialogRect.height,
+                x: 0,
+                y: 0,
+            };
+            if (!this.dialogRelatives.parentNode) {
+                this._initialDialogRect.x = dialogRect.x + window.pageXOffset;
+                this._initialDialogRect.y = dialogRect.y + window.pageYOffset;
+            }
+        }
         if (!this.dialogRelatives.parentNode) {
             let elemAtCogCenter;
             this.buttons.cog.style.display = 'block';
@@ -458,10 +472,6 @@
                 return;
             }
         }
-        const dialogRect = this.dialog.getBoundingClientRect();
-        if (!this._dialogHeight) {
-            this._dialogHeight = dialogRect.height;
-        }
         // if we have been called by a scrolling event handler, check
         // how much the dialog and the cog button have moved since the
         // previous event.
@@ -487,15 +497,19 @@
         // has not scrolled as much as the cog button has, compute
         // the dialog position and set it
         const beforeNodeRect = this.dialogRelatives.beforeNode?.getBoundingClientRect() || this.getViewPortRect();
-        const topLeft = {...cogCenter};
-        topLeft.y -= this._dialogHeight;
-        // if the dialog does not fit at the right of the cog, put it on the left
-        if (!e && topLeft.x + dialogRect.width > beforeNodeRect.x + beforeNodeRect.width) {
-            this.offset.x = -dialogRect.width;
-        }
-        // if the dialog does not fit above the cog, put it below
-        if (!e && topLeft.y < 0) {
-                this.offset.y = this._dialogHeight;
+        const topLeft = {
+            x: cogCenter.x - this._initialDialogRect.x,
+            y: cogCenter.y - this._initialDialogRect.y - this._initialDialogRect.height,
+        };
+        if (!e) {
+            // if the dialog does not fit at the right of the cog, put it on the left
+            if (topLeft.x + dialogRect.width > beforeNodeRect.x + beforeNodeRect.width) {
+                this.offset.x = -dialogRect.width;
+            }
+            // if the dialog does not fit above the cog, put it below
+            if (topLeft.y < 0) {
+                this.offset.y = this._initialDialogRect.height;
+            }
         }
         topLeft.x -= beforeNodeRect.left;
         topLeft.y -=  beforeNodeRect.top;

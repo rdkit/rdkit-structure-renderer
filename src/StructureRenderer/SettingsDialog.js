@@ -496,23 +496,26 @@ class SettingsDialog {
         // if this is not a scrolling event, or it is and the dialog
         // has not scrolled as much as the cog button has, compute
         // the dialog position and set it
-        const beforeNodeRect = this.dialogRelatives.beforeNode?.getBoundingClientRect() || this.getViewPortRect();
+        const viewPortRect = this.getViewPortRect();
+        const beforeNodeRect = this.dialogRelatives.beforeNode?.getBoundingClientRect() || viewPortRect;
         const topLeft = {
             x: cogCenter.x - this._initialDialogRect.x,
             y: cogCenter.y - this._initialDialogRect.y - this._initialDialogRect.height,
         };
         if (!e) {
             // if the dialog does not fit at the right of the cog, put it on the left
-            if (topLeft.x + dialogRect.width > beforeNodeRect.x + beforeNodeRect.width) {
+            if (topLeft.x + dialogRect.width > Math.min(
+                viewPortRect.left + viewPortRect.width,
+                beforeNodeRect.left + beforeNodeRect.width)) {
                 this.offset.x = -dialogRect.width;
             }
             // if the dialog does not fit above the cog, put it below
-            if (topLeft.y < 0) {
+            if (topLeft.y < Math.max(viewPortRect.top, beforeNodeRect.top)) {
                 this.offset.y = this._initialDialogRect.height;
             }
         }
         topLeft.x -= beforeNodeRect.left;
-        topLeft.y -=  beforeNodeRect.top;
+        topLeft.y -= beforeNodeRect.top;
         // this is the new top left corner of the dialog
         const styleLeft = Math.round(topLeft.x + this.offset.x) + window.pageXOffset;
         const styleTop = Math.round(topLeft.y + this.offset.y) + window.pageYOffset;

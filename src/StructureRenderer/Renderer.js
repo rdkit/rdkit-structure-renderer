@@ -1065,6 +1065,10 @@ const Renderer = {
                         delete drawOpts.atoms;
                         delete drawOpts.bonds;
                     }
+                    // if the background is white, set full transparency
+                    if (drawOpts.backgroundColour.slice(0, 3).every(c => c > 0.99)) {
+                        drawOpts.backgroundColour[3] = 0;
+                    }
                     drawOpts.addAtomIndices = userOpts.ATOM_IDX;
                     drawOpts.fixedBondLength *= this.copyImgScaleFac;
                     drawOpts.width = Math.round(divRect.width * this.copyImgScaleFac);

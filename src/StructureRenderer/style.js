@@ -30,8 +30,10 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
+import { RDK_STR_RNR } from './constants.js';
+
 const css =
-`.rdk-str-rnr-mol-container {
+`.${RDK_STR_RNR}mol-container {
     display: block;
     position: relative;
     background-color: white;
@@ -48,7 +50,7 @@ const css =
     100% { transform: rotate(360deg); }
 }
 
-.rdk-str-rnr-spinner {
+.${RDK_STR_RNR}spinner {
     display: none;
     background-color: white;
     position: absolute;
@@ -57,7 +59,7 @@ const css =
     z-index: 11;
 }
 
-.rdk-str-rnr-spinner .whl {
+.${RDK_STR_RNR}spinner .whl {
     display: block;
     margin: auto;
     border-style: solid;
@@ -68,11 +70,11 @@ const css =
     animation: spin 1s linear infinite;
 }
 
-.rdk-str-rnr-mol-draw {
+.${RDK_STR_RNR}mol-draw {
     position: absolute;
 }
 
-.rdk-str-rnr-mol-container .button {
+.${RDK_STR_RNR}mol-container .button {
     position: absolute;
     top: 1px;
     opacity: 0;
@@ -87,38 +89,38 @@ const css =
     transition-duration: 0.2s;
 } 
 
-.rdk-str-rnr-mol-container .copy {
+.${RDK_STR_RNR}mol-container .copy {
     left: 1px;
 } 
 
-.rdk-str-rnr-mol-container .cog {
+.${RDK_STR_RNR}mol-container .cog {
     right: 1px;
 } 
 
-.rdk-str-rnr-button-icon {
+.${RDK_STR_RNR}button-icon {
     width: 10px;
     height: 10px;
 } 
 
-.rdk-str-rnr-button-icon img {
+.${RDK_STR_RNR}button-icon img {
     vertical-align: baseline;
 }
 
 /* turn SVG dark gray (#A9A9A9) upon hovering, see https://codepen.io/sosuke/pen/Pjoqqp */
-.rdk-str-rnr-button-icon:hover {
+.${RDK_STR_RNR}button-icon:hover {
     filter: invert(62%) sepia(0%) saturate(35%) hue-rotate(144deg) brightness(107%) contrast(98%);
     transition-duration: 0.2s;
 }
 
-.rdk-str-rnr-mol-container:hover .button {
+.${RDK_STR_RNR}mol-container:hover .button {
     opacity: 1;
 }
 
-.rdk-str-rnr-mol-container .always-visible {
+.${RDK_STR_RNR}mol-container .always-visible {
     opacity: 1;
 } 
 
-.rdk-str-rnr-dialog {
+.${RDK_STR_RNR}dialog {
     display: block;
     position: absolute;
     background: white;
@@ -133,14 +135,14 @@ const css =
     font-weight: normal;
 }
 
-.rdk-str-rnr-title {
+.${RDK_STR_RNR}title {
     display: inline-block;
     margin: 5px 8px 0px 8px;
     font-weight: bold;
     line-height: 1.3;
 }
 
-.rdk-str-rnr-checkbox {
+.${RDK_STR_RNR}checkbox {
     color: black;
     display: block;
     position: relative;
@@ -151,17 +153,17 @@ const css =
     line-height: 1.3;
 }
 
-.rdk-str-rnr-checkbox[disabled] {
+.${RDK_STR_RNR}checkbox[disabled] {
     color: lightgray;
 }
 
-.rdk-str-rnr-checkbox input {
+.${RDK_STR_RNR}checkbox input {
     margin: 0;
     visibility: hidden;
     cursor: pointer;
 }
 
-.rdk-str-rnr-checkbox .box {
+.${RDK_STR_RNR}checkbox .box {
     position: absolute;
     top: 1px;
     left: 0px;
@@ -172,30 +174,30 @@ const css =
     box-sizing: content-box;
 }
 
-.rdk-str-rnr-checkbox[disabled] .box {
+.${RDK_STR_RNR}checkbox[disabled] .box {
     border: 2px solid lightgray;
 }
 
-.rdk-str-rnr-checkbox:hover:not([disabled]) input ~ .box {
+.${RDK_STR_RNR}checkbox:hover:not([disabled]) input ~ .box {
     background-color: lightgray;
 }
 
-.rdk-str-rnr-checkbox:hover:not([disabled]) input:checked ~ .box {
+.${RDK_STR_RNR}checkbox:hover:not([disabled]) input:checked ~ .box {
     background-color: blue;
 }
 
-.rdk-str-rnr-checkbox input:checked ~ .box {
+.${RDK_STR_RNR}checkbox input:checked ~ .box {
     background-color: blue;
     border: solid blue;
     border-width: 2px;
     transition-duration: 0.2s;
 }
 
-.rdk-str-rnr-checkbox input ~ .mark {
+.${RDK_STR_RNR}checkbox input ~ .mark {
     display: none;
 }
 
-.rdk-str-rnr-checkbox input:checked ~ .mark {
+.${RDK_STR_RNR}checkbox input:checked ~ .mark {
     display: block;
     position: absolute;
     left: 4px;
@@ -210,7 +212,7 @@ const css =
     box-sizing: content-box;
 }
 
-.rdk-str-rnr-formats {
+.${RDK_STR_RNR}formats {
     display: block;
     position: relative;
     margin: 3px 8px 3px 8px;
@@ -219,7 +221,7 @@ const css =
     font-size: 12px;
 }
 
-.rdk-str-rnr-formats .label {
+.${RDK_STR_RNR}formats .label {
     display: inline-block;
     box-sizing: border-box;
     cursor: pointer;
@@ -229,16 +231,16 @@ const css =
     line-height: 1.3;
 }
 
-.rdk-str-rnr-formats .chevron-label {
+.${RDK_STR_RNR}formats .chevron-label {
     padding: 3px 0px 0px 20px;
 }
 
-.rdk-str-rnr-formats input[type=checkbox] {
+.${RDK_STR_RNR}formats input[type=checkbox] {
     visibility: hidden;
     cursor: pointer;
 }
 
-.rdk-str-rnr-formats input ~ .chevron {
+.${RDK_STR_RNR}formats input ~ .chevron {
     position: absolute;
     height: 6px;
     width: 6px;
@@ -249,57 +251,57 @@ const css =
     box-sizing: content-box;
 }
 
-.rdk-str-rnr-formats input ~ .chevron:hover {
+.${RDK_STR_RNR}formats input ~ .chevron:hover {
     border-color: darkgray;
     transition-duration: 0.2s;
 }
 
-.rdk-str-rnr-formats input ~ .collapsed {
+.${RDK_STR_RNR}formats input ~ .collapsed {
     display: block;
     top: 7px;
     left: 2px;
     transform: rotate(-45deg);
 }
 
-.rdk-str-rnr-formats input:checked ~ .collapsed {
+.${RDK_STR_RNR}formats input:checked ~ .collapsed {
     display: none;
 }
 
-.rdk-str-rnr-formats input ~ .expanded {
+.${RDK_STR_RNR}formats input ~ .expanded {
     display: none;
     top: 5px;
     left: 2px;
     transform: rotate(45deg);
 }
 
-.rdk-str-rnr-formats input:checked ~ .expanded {
+.${RDK_STR_RNR}formats input:checked ~ .expanded {
     display: block;
 }
 
-.rdk-str-rnr-formats input:checked ~ .spinner {
+.${RDK_STR_RNR}formats input:checked ~ .spinner {
     display: block;
     position: relative;
     z-index: 11;
 }
 
-.rdk-str-rnr-formats input ~ .spinner {
+.${RDK_STR_RNR}formats input ~ .spinner {
     display: none;
 }
 
-.rdk-str-rnr-formats input ~ .label {
+.${RDK_STR_RNR}formats input ~ .label {
     display: none;
 }
 
-.rdk-str-rnr-formats input ~ .table {
+.${RDK_STR_RNR}formats input ~ .table {
     display: none;
 }
 
-.rdk-str-rnr-formats input:checked ~ .label {
+.${RDK_STR_RNR}formats input:checked ~ .label {
     display: inline-block;
     margin: 8px 0 3px 0;
 }
 
-.rdk-str-rnr-formats input:checked ~ .table {
+.${RDK_STR_RNR}formats input:checked ~ .table {
     display: table;
     margin: 8px 0px 0px 0px;
     border-collapse: collapse;
@@ -307,7 +309,7 @@ const css =
     line-height: 1.3;
 }
 
-.rdk-str-rnr-formats .scale {
+.${RDK_STR_RNR}formats .scale {
     display: inline-block;
     border-width: 2px;
     border-color: black;
@@ -316,20 +318,20 @@ const css =
     cursor: auto;
 }
 
-.rdk-str-rnr-formats .fmtcell {
+.${RDK_STR_RNR}formats .fmtcell {
     border: none;
     padding: 0 0.5em 0 0;
     vertical-align: middle;
 }
 
-.rdk-str-rnr-formats .scalecell {
+.${RDK_STR_RNR}formats .scalecell {
     border: none;
     padding: 0 0 4px 0;
     text-align: right;
     vertical-align: middle;
 }
 
-.rdk-str-rnr-formats .copy {
+.${RDK_STR_RNR}formats .copy {
     display: inline-block;
     border: none;
     outline: none;
@@ -339,19 +341,19 @@ const css =
 }
 
 /* turn SVG light gray (#D3D3D3) when disabled, see https://codepen.io/sosuke/pen/Pjoqqp */
-.rdk-str-rnr-formats .disabled-icon {
+.${RDK_STR_RNR}formats .disabled-icon {
     filter: invert(96%) sepia(0%) saturate(0%) hue-rotate(182deg) brightness(92%) contrast(86%);
 }
 
-.rdk-str-rnr-formats .disabled-label {
+.${RDK_STR_RNR}formats .disabled-label {
     color: lightgray;
 }
 
-.rdk-str-rnr-formats input ~ .box {
+.${RDK_STR_RNR}formats input ~ .box {
     display: none;
 }
 
-.rdk-str-rnr-formats input:checked ~ .box {
+.${RDK_STR_RNR}formats input:checked ~ .box {
     display: block;
     padding: 4px;
     background-color: white;
@@ -364,24 +366,24 @@ const css =
     line-height: normal;
 }
 
-.rdk-str-rnr-formats input:checked ~ .box::-webkit-scrollbar {
+.${RDK_STR_RNR}formats input:checked ~ .box::-webkit-scrollbar {
     width: 0.8em;
     height: 0.8em;
     background: #f1f1f1;
 }
 
-.rdk-str-rnr-formats input:checked ~ .box::-webkit-scrollbar-thumb {
+.${RDK_STR_RNR}formats input:checked ~ .box::-webkit-scrollbar-thumb {
     background: #c1c1c1;
 }
 
-.rdk-str-rnr-formats input:checked ~ .smilesinchi {
+.${RDK_STR_RNR}formats input:checked ~ .smilesinchi {
     min-height: 2em;
     max-height: 4em;
     height: 2em;
     overflow-y: scroll;
 }
 
-.rdk-str-rnr-formats input:checked ~ .molblock {
+.${RDK_STR_RNR}formats input:checked ~ .molblock {
     min-height: 6em;
     max-height: 12em;
     height: 6em;

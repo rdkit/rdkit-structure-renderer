@@ -8,7 +8,7 @@
         "build": "npm run build:pkg && npm run build:prod",
         "build:dev": "webpack --mode=development",
         "build:prod": "webpack --mode=production --node-env=production",
-        "build:pkg": "gulp rdkitCopy && pika-pack",
+        "build:pkg": "gulp buildPackage",
         "lint": "eslint src",
         "lint:fix": "eslint --fix --ext .js,.jsx .",
         "watch": "webpack --watch",

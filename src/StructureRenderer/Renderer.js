@@ -36,13 +36,15 @@ import defaultIcons from './icons.js';
 import Scheduler from './Scheduler.js';
 import SettingsDialog from './SettingsDialog.js';
 import {
+    cssToText,
     decodeNewline,
     dataAttr,
     dashToCamelCase,
+    getMolblockFromMol,
     keyToTag,
-    getMolblockFromMol
 } from './utils.js';
 import {
+    DEFAULT_IMG_OPTS,
     DEFAULT_DRAW_OPTS,
     RDK_STR_RNR,
     DIVID_SEPARATOR,
@@ -69,12 +71,6 @@ const Renderer = {
      * @returns {number} Maximum allowed concurrency independently of hardware
      */
     getMaxConcurrency: () => 8,
-
-    /**
-     * Override for custom CSS.
-     * @returns {string} CSS style used by Renderer
-     */
-    getRendererCss: () => defaultRendererCss,
 
     /**
      * Override for custom HTML.
@@ -145,10 +141,18 @@ const Renderer = {
     },
 
     /**
+     * Override to use a different RdkStrRnr prefix.
+     * @returns {string} the RdkStrRnr prefix
+     */
+    getRdkStrRnrPrefix: () => RDK_STR_RNR,
+
+    /**
      * Override to use a different divId prefix.
      * @returns {string} the divId prefix
      */
-    getDivIdPrefix: () => `${RDK_STR_RNR}mol-`,
+    getDivIdPrefix: function() {
+        return this.getRdkStrRnrPrefix() + 'mol-';
+    },
 
     /**
      * Override to use a different separator in divId.
@@ -174,8 +178,9 @@ const Renderer = {
     },
 
     /**
-     * Override to use different button names.
-     * @returns {Array<string>} an array of button names
+     * Override to use different button types.
+     * @returns {Array<object>} an array of objects describing
+     * button names and tooltips
      */
     getButtonTypes: () => BUTTON_TYPES,
 
@@ -188,30 +193,82 @@ const Renderer = {
     },
 
     /**
-     * Override to use different user opts.
+     * Override to use a different CSS style.
+     * @returns {object} CSS style used by Renderer as a key, value dictionary
+     */
+    getRendererCss: () => defaultRendererCss,
+
+    /**
+     * Sets the available user opt entries. Call with custom
+     * userOpts to customize user opt entries.
+     * @param {object} userOpts optional custom user opts
+     */
+    setAvailUserOpts: function(userOpts) {
+        this._userOpts = Object.fromEntries(
+            Object.entries(userOpts || USER_OPTS).map(([k, text]) =>
+                [k, { tag: keyToTag(k), text }]));
+    },
+
+    /**
+     * Get default user opt entries.
+     * @returns {object} key, value user opt dictionary
+     */
+    getDefaultUserOpts: () => USER_OPTS,
+
+    /**
+     * Get available user opts as a { key: { tag, text } } dictionary.
      * @returns {object} a dictionary relating tag keys to a { tag, text }
      * dictionary where tag is the HTML tag name and text is the label
      * displayed in the SettingsDialog. If text is null, the entry is not
      * displayed in the SettingsDialog, but can still be set programmatically
      * through the HTML tag
      */
-    getUserOpts: function() {
-         if (!this._userOpts) {
-             this._userOpts = Object.fromEntries(
-                 Object.entries(USER_OPTS).map(([k, text]) =>
-                     [k, { tag: keyToTag(k), text }]));
-         }
-         return this._userOpts;
-     },
+    getAvailUserOpts: function() {
+        if (!this._userOpts) {
+            this.setAvailUserOpts();
+        }
+        return this._userOpts;
+    },
 
     /**
-     * Get boolean user options for a given div.
-     * @param {Element} div
+     * Get current user opts for a certain key as a key, value dictionary.
+     * Note that if there are multiple divs relating to the same key,
+     * the values from the first div will be picked.
+     * @returns {object} a dictionary relating opt name (all uppercase) to value
+     */
+    getUserOptsForKey: function(key) {
+        const divId = this.getFirstDivIdFromDivIdOrKey(key);
+        let div;
+        if (divId) {
+            div = this.getMolDiv(divId);
+        }
+        return this.getUserOptsForDiv(div || key) || {};
+    },
+
+    /**
+     * Set user opts for a certain key from a key, value dictionary.
+     * All divs related to the same key will be updated.
+     * @param {object} opts dictionary relating opt name (all uppercase) to value
+     */
+    setUserOptsForKey: function(key, opts) {
+        const userOpts = this.getAvailUserOpts();
+        Object.entries(opts).forEach(([opt, value]) => {
+            const tag = userOpts[opt]?.tag;
+            tag && this.updateUserOptCache(key, tag, value);
+        });
+        this.getDivIdArrayFromDivIdOrKey(key).forEach(
+            divId => this.updateMolDrawDivIfNeeded(divId));
+    },
+
+    /**
+     * Get boolean user options for a given div or divId.
+     * @param {Element|string} div div or divId
      * @returns {object} dictionary mapping each userOpt key to its boolean value
      */
     getUserOptsForDiv: function(div) {
-        return Object.fromEntries(Object.entries(
-            this.getUserOpts()).map(([k, { tag }]) => [k, this.getBoolOpt(div, tag)]));
+        return Object.fromEntries(Object.entries(this.getAvailUserOpts()).map(
+            ([k, { tag }]) => [k, this.getBoolOpt(div, tag)]).filter(
+                ([, v]) => typeof v !== 'undefined'));
     },
 
     /**
@@ -237,14 +294,16 @@ const Renderer = {
     },
 
     /**
-     * Return div containing the SVG icon for buttonType.
-     * @param {string} buttonType 'copy' or 'cog'
+     * Return div containing the SVG icon for type.
+     * @param {string} type 'copy' or 'cog'
      * @returns {Element} HTML div containing the SVG icon
      */
-    getButtonIcon: buttonType => {
+    getButtonIcon: function(type) {
         const div = document.createElement('div');
-        div.className = `${RDK_STR_RNR}button-icon`;
-        div.innerHTML = defaultIcons[buttonType];
+        const span = document.createElement('span');
+        div.appendChild(span);
+        span.className = this.getRdkStrRnrPrefix() + 'button-icon';
+        span.innerHTML = defaultIcons[type];
         return div;
     },
 
@@ -265,9 +324,37 @@ const Renderer = {
     getCheckableUserOpts: function() {
         if (!this._checkableUserOpts) {
             this._checkableUserOpts = Object.values(
-                this.getUserOpts()).filter(({ text }) => text !== null);
+                this.getAvailUserOpts()).filter(({ text }) => text !== null);
         }
         return this._checkableUserOpts;
+    },
+
+    /**
+     * Set the rdkit-structure-renderer style to the
+     * passed CSS, or to the default CSS if the passed
+     * css is falsy
+     * @param {object} css key, value dictionary
+     */
+    setRendererCss: function(css) {
+        const RDK_CSS_ID = this.getRdkStrRnrPrefix() + 'css';
+        let style = document.getElementById(RDK_CSS_ID);
+        // if style already exists and no css is passed,
+        // do nothing
+        if (style && !css) {
+            return;
+        }
+        css = css || this.getRendererCss();
+        css = cssToText(css);
+        if (!style) {
+            style = document.createElement('style');
+            const styleText = document.createTextNode(css);
+            style.id = RDK_CSS_ID;
+            style.setAttribute('type', 'text/css');
+            style.appendChild(styleText);
+            document.head.appendChild(style);
+        } else {
+            style.firstChild.innerHTML = css;
+        }
     },
 
     /**
@@ -284,29 +371,16 @@ const Renderer = {
             return Promise.resolve(this);
         }
         if (!this._minimalLibJs) {
-            const RDK_CSS_ID = `${RDK_STR_RNR}css`;
-            const _loadRendererCss = () => {
-                const rendererCss = this.getRendererCss();
-                const style = document.createElement('style');
-                const styleText = document.createTextNode(rendererCss);
-                style.id = RDK_CSS_ID;
-                style.setAttribute('type', 'text/css');
-                style.appendChild(styleText);
-                document.head.appendChild(style);
-            };
             if (typeof minimalLibPath !== 'string') {
                 minimalLibPath = document.currentScript?.src || '';
             }
             this._minimalLibPath = minimalLibPath.substring(0, minimalLibPath.lastIndexOf('/'));
             this._minimalLibJs = `${this._minimalLibPath}/RDKit_minimal.js`;
-            if (!document.getElementById(RDK_CSS_ID)) {
-                _loadRendererCss();
-            }
         }
         // if the RDKit module has already been initialzed, return it
         const _loadRDKitModule = (resolve) => {
             const TIMEOUT = 50;
-            const RDK_LOADER_ID = `${RDK_STR_RNR}loader`;
+            const RDK_LOADER_ID = this.getRdkStrRnrPrefix() + 'loader';
             if (typeof _RDKitModule === 'undefined') {
                 _RDKitModule = null;
                 if (!document.getElementById(RDK_LOADER_ID)) {
@@ -449,7 +523,8 @@ const Renderer = {
         const disable = !shouldEnable;
         button.disabled = disable;
         if (useGreyOut) {
-            modifyClass(button, 'disabled-icon', disable);
+            const iconSpan = button.firstChild.firstChild;
+            modifyClass(iconSpan, 'disabled-icon', disable);
             const label = button.parentNode;
             if (label && label.nodeName === 'LABEL') {
                 modifyClass(label, 'disabled-label', disable);
@@ -465,8 +540,8 @@ const Renderer = {
      * and associated label (if any)
      */
     setButtonsEnabled: function(div, shouldEnable, useGreyOut) {
-        this.getButtonTypes().forEach(buttonType => {
-            const button = this.getButton(div, buttonType);
+        this.getButtonTypes().forEach(({ type }) => {
+            const button = this.getButton(div, type);
             button && this.setButtonEnabled(button, shouldEnable, useGreyOut);
         });
     },
@@ -474,10 +549,10 @@ const Renderer = {
     /**
      * Print an error message to the console if the copy
      * to clipboard operation failed.
-     * @param {string} failedTo operation that failed
+     * @param {string} msg error message
      */
-    logClipboardError: (failedTo) =>
-        console.error(`Unable to copy to clipboard - Failed to ${failedTo}`),
+    logClipboardError: (msg) =>
+        console.error(`${msg ? msg + '\n' : ''}Unable to copy to clipboard`),
 
     /**
      * Return true if clipboard can be accessed.
@@ -488,11 +563,11 @@ const Renderer = {
         try {
             permissionStatus = await navigator.permissions.query(this.getClipboardOpts());
         } catch {
-            this.logClipboardError('query permissions');
+            this.logClipboardError('Failed to query permissions');
             return false;
         }
         if (permissionStatus.state === 'denied') {
-            this.logClipboardError('obtain permission');
+            this.logClipboardError('Failed to obtain permission');
             return false;
         }
         return true;
@@ -544,11 +619,18 @@ const Renderer = {
      * @param {string} molText molecule description (SMILES or molblock)
      * @param {string} scaffoldText scaffold description (SMILES or molblock)
      * @param {object} opts rendering options
-     * @returns {string} a Promise that will resolve to an object containing
-     * the mol pickle when the job is completed, or to null
+     * @returns {Promise} a Promise that will resolve to an object
+     * containing the mol pickle when the job is completed, or to null
      * if the job is aborted before being submitted
      */
     requestMolPickle: function(divId, molText, scaffoldText, opts) {
+        if (!molText) {
+            return Promise.resolve({
+                pickle: new Uint8Array(),
+                match: null,
+                svg: null,
+            });
+        }
         let type = 'r';
         if (scaffoldText) {
             type = 'a';
@@ -573,7 +655,7 @@ const Renderer = {
      * the SVG when the job is completed, or to null
      * if the job is aborted before being submitted
      */
-     requestSvg: function(divId, molPickle, opts) {
+    requestSvg: function(divId, molPickle, opts) {
         const type = 's';
         return this.submit({
             divId,
@@ -594,11 +676,10 @@ const Renderer = {
     },
 
     /**
-     * Increment the number of references to divId by one
-     * @param {string} divId
+     * Increment the number of references to key by one
+     * @param {string} key cache key
      */
-    incRef: function(divId) {
-        const key = this.getCacheKey(divId);
+    incRef: function(key) {
         const cachedEntry = this.userOptCache[key] || {
             refCount: 0,
         };
@@ -607,12 +688,11 @@ const Renderer = {
     },
 
     /**
-     * Decrement the number of references to divId by one
+     * Decrement the number of references to key by one
      * When the number drops to zero, cached coordinates are deleted.
-     * @param {string} divId
+     * @param {string} key cache key
      */
-    decRef: function(divId) {
-        const key = this.getCacheKey(divId);
+    decRef: function(key) {
         const cachedEntry = this.userOptCache[key];
         if (cachedEntry && !--cachedEntry.refCount) {
             delete cachedEntry.currentMol;
@@ -620,21 +700,19 @@ const Renderer = {
     },
 
     /**
-     * Get current molecule coordinates and match for a given div.
-     * @param {Element|string} div div or divId
-     * @returns {object} molecule coordinates and match
+     * Get current molecule coordinates and match for a given key.
+     * @param {string} key cache key
+     * @returns {object|null} { pickle, match } dictionary for current mol
      */
-    getCurrentMol: function(div) {
-        const key = this.getCacheKey(div);
-        return this.userOptCache[key]?.currentMol || {};
+    getCurrentMol: function(key) {
+        return this.userOptCache[key]?.currentMol || null;
     },
 
     /**
-     * Clear cached coordinates and match asocated to a given div.
-     * @param {Element|string} div div or divId
+     * Clear cached coordinates and match associated to a given key.
+     * @param {string} key cache key
      */
-    clearCurrentMol: function(div) {
-        const key = this.getCacheKey(div);
+    clearCurrentMol: function(key) {
         const cachedEntry = this.userOptCache[key];
         if (cachedEntry) {
             cachedEntry.currentMol = null;
@@ -642,13 +720,12 @@ const Renderer = {
     },
 
     /**
-     * Set current molecule coordinates and match for a given div.
-     * @param {Element|string} div div or divId
+     * Set current molecule coordinates and match for a given key.
+     * @param {string} key cache key
      * @param {Uint8Array} pickle molecule pickle
      * @param {string} match scaffold match
      */
-    setCurrentMol: function(div, pickle, match) {
-        const key = this.getCacheKey(div);
+    setCurrentMol: function(key, pickle, match) {
         const cachedEntry = this.userOptCache[key];
         if (cachedEntry) {
             cachedEntry.currentMol = {
@@ -665,35 +742,7 @@ const Renderer = {
      */
     getScaffold: function(div) {
         const attr = dataAttr(this.getDivAttrs().SCAFFOLD);
-        return div.getAttribute(attr) || '';
-    },
-
-    /**
-     * Get 2D coords as pickle for a given div.
-     * @param {Element} div
-     * @param {boolean} align true if aligned coords were requested
-     * @returns {object} object containing pickle with
-     * 2D coords (and indices matching the scaffold)
-     */
-     getMolCoords: async function(div, userOpts) {
-        let scaffoldText;
-        if (userOpts.SCAFFOLD_ALIGN || userOpts.SCAFFOLD_HIGHLIGHT) {
-            scaffoldText = this.getScaffold(div) || '';
-            if (!scaffoldText) {
-                return this.getMolCoords(div, false);
-            }
-        }
-        const molText = this.getMol(div);
-        let res = {
-            pickle: new Uint8Array(),
-            match: null,
-            svg: null,
-        };
-        if (molText) {
-            const divId = this.getDivId(div)
-            res = await this.requestMolPickle(divId, molText, scaffoldText, userOpts);
-        }
-        return res;
+        return decodeNewline(div.getAttribute(attr) || '');
     },
 
     /**
@@ -755,14 +804,18 @@ const Renderer = {
     },
 
     /**
-     * For a given div, get the draw options encoded as
+     * For a given div or divId, get the draw options encoded as
      * a JSON string. The draw options which are not defined
      * in the div are replaced by default values.
-     * @param {Element} div
+     * @param {Element|string} div div or divId
      * @returns {object} draw options as a key: value dictionary
      */
     getDrawOpts: function(div) {
-        return {...this.getDefaultDrawOpts(), ...(this.getJsonOpt(div, this.getDivAttrs().DRAW_OPTS) || {})};
+        const res = { ...this.getDefaultDrawOpts() };
+        if (typeof div === 'object') {
+            Object.assign(res, this.getJsonOpt(div, this.getDivAttrs().DRAW_OPTS) || {});
+        }
+        return res;
     },
 
     /**
@@ -815,8 +868,6 @@ const Renderer = {
                 const type = molDraw?.nodeName;
                 if (type) {
                     if (type === 'CANVAS') {
-                        molDraw.width = drawOpts.width;
-                        molDraw.height = drawOpts.height;
                         return mol.draw_to_canvas_with_highlights(molDraw, drawOptsText);
                     } else if (type !== 'DIV') {
                         console.error(`write2DLayout: unsupported nodeName ${type}`);
@@ -830,9 +881,7 @@ const Renderer = {
                 console.error('write2DLayout: expected JSMol or SVG string');
                 svg = '';
             }
-            if (molDraw?.style) {
-                molDraw.style.width = drawOpts.width;
-                molDraw.style.height = drawOpts.height;
+            if (molDraw) {
                 molDraw.innerHTML = svg;
             }
             return svg;
@@ -846,6 +895,40 @@ const Renderer = {
             } catch {
                 // if we fail we draw nothing
             }
+        }
+        return res;
+    },
+
+    getPickledMolAndMatch: async function(divId, molText, scaffoldText, userOpts) {
+        const key = this.getCacheKey(divId);
+        const failsMatch = this.getFailsMatch(key, scaffoldText);
+        const promArray = [];
+        let res = null;
+        // if the user wants to align to a scaffoldText or highlight
+        // the scaffoldText, we need an aligned layout + matches
+        if (!failsMatch && (userOpts.SCAFFOLD_ALIGN || userOpts.SCAFFOLD_HIGHLIGHT)) {
+            promArray.push(this.requestMolPickle(divId, molText, scaffoldText, userOpts));
+        }
+        // if the user does not want to align to a scaffoldText, we
+        // need an unaligned layout
+        if (failsMatch || !userOpts.SCAFFOLD_ALIGN) {
+            promArray.push(this.requestMolPickle(divId, molText, null, {
+                ...userOpts,
+                SCAFFOLD_ALIGN: false,
+                SCAFFOLD_HIGHLIGHT: false,
+            }));
+        }
+        const resArray = await Promise.all(promArray);
+        if (resArray.every(res => res)) {
+            // if a match was requested, it will be in the first Promise
+            // otherwise it will be undefined
+            const firstRes = resArray[0];
+            const lastRes = resArray[resArray.length - 1];
+            res = {
+                match: firstRes.match,
+                // the pickle will always be from the last promise
+                pickle: lastRes.pickle,
+            };
         }
         return res;
     },
@@ -864,62 +947,35 @@ const Renderer = {
     draw: async function(div, returnMolBlock) {
         // if the div has 0 size, do nothing, as it may have
         // already been unmounted
-        const divRect = div.getBoundingClientRect();
-        if (!divRect.width || !divRect.height) {
-            return null;
-        }
+        const { width, height } = this.getDivRoundedSize(div);
         // get a spinner wheel with a radius appropriate
         // to the size of div
         const spinner = this.getSpinner(div);
         let molblock = '';
         const _asyncDraw = async (tid) => {
-            const rdkitModulePromise = this.getRDKitModule();
             // get the HTML element where we are going to draw
             const molDraw = this.getMolDraw(div);
             const userOpts = this.getUserOptsForDiv(div);
             const drawOpts = this.getDrawOpts(div);
             drawOpts.addAtomIndices = userOpts.ATOM_IDX;
-            drawOpts.width = Math.round(divRect.width);
-            drawOpts.height = Math.round(divRect.height);
-            let { pickle, match } = this.getCurrentMol(div);
-            const scaffold = this.getScaffold(div);
-            const failsMatch = this.getFailsMatch(div, scaffold);
-            const needMatch = (userOpts.SCAFFOLD_ALIGN || userOpts.SCAFFOLD_HIGHLIGHT);
+            drawOpts.width = width;
+            drawOpts.height = height;
+            const key = this.getCacheKey(div);
+            let res = this.getCurrentMol(key);
+            const scaffoldText = this.getScaffold(div);
             const divId = this.getDivId(div);
-            if (!pickle) {
-                const promArray = [];
-                // if the user wants to align to a scaffold or highlight
-                // the scaffold, we need an aligned layout + matches
-                if (needMatch && !failsMatch) {
-                    promArray.push(this.getMolCoords(div, userOpts));
-                }
-                // if the user does not want to align to a scaffold, we
-                // need an unaligned layout
-                if (!userOpts.SCAFFOLD_ALIGN || failsMatch) {
-                    promArray.push(this.getMolCoords(div, {
-                        ...userOpts,
-                        SCAFFOLD_ALIGN: false,
-                        SCAFFOLD_HIGHLIGHT: false,
-                    }));
-                }
-                const resArray = await Promise.all(promArray);
-                if (resArray.every(res => res)) {
-                    // if a match was requested, it will be in the first Promise
-                    // otherwise it will be undefined
-                    const firstRes = resArray[0];
-                    const lastRes = resArray[resArray.length - 1];
-                    match = firstRes.match;
-                    // the pickle will always be from the last promise
-                    pickle = lastRes.pickle;
-                }
+            if (!res) {
+                const molText = this.getMol(div);
+                res = await this.getPickledMolAndMatch(divId, molText, scaffoldText, userOpts) || {};
             }
+            const { pickle, match } = res;
             if (pickle) {
-                this.setCurrentMol(div, pickle, match);
-                if (needMatch) {
+                this.setCurrentMol(key, pickle, match);
+                if (userOpts.SCAFFOLD_ALIGN || userOpts.SCAFFOLD_HIGHLIGHT) {
                     if (!match) {
-                        this.setFailsMatch(div, scaffold);
+                        this.setFailsMatch(key, scaffoldText);
                     } else {
-                        this.clearFailsMatch(div);
+                        this.clearFailsMatch(key);
                     }
                 }
                 if (userOpts.SCAFFOLD_HIGHLIGHT && match) {
@@ -936,11 +992,9 @@ const Renderer = {
                     }
                 }
                 if (!useSvg || returnMolBlock) {
-                    // block until rdkitModule is ready
-                    const rdkitModule = await rdkitModulePromise;
-                    const mol = rdkitModule.get_mol_from_uint8array(pickle);
+                    const mol = await this.getMolFromPickle(pickle);
                     if (mol) {
-                        if (mol.is_valid()) {
+                        try {
                             if (returnMolBlock) {
                                 molblock = getMolblockFromMol(mol);
                             }
@@ -950,8 +1004,11 @@ const Renderer = {
                                 }
                                 this.write2DLayout(mol, drawOpts, molDraw);
                             }
+                        } catch(e) {
+                            console.error(`Failed to draw to div`);
+                        } finally {
+                            mol.delete();
                         }
-                        mol.delete();
                     }
                 }
             }
@@ -973,13 +1030,13 @@ const Renderer = {
     /**
      * Called when the copy or cog buttons are clicked.
      * @param {Event} e the click event
-     * @param {string} buttonType either 'copy' or 'cog'
+     * @param {string} type either 'copy' or 'cog'
      * @param {Element} div
      * @returns {function} either the copyAction or cogAction function
      */
-    onButtonAction: function(e, buttonType, div) {
+    onButtonAction: function(e, type, div) {
         e.stopPropagation();
-        return this[buttonType + 'Action'](div);
+        return this[type + 'Action'](div);
     },
 
     /**
@@ -998,42 +1055,253 @@ const Renderer = {
             res = true;
         } catch (e) {
             console.error('%O', e);
-            this.logClipboardError(`write content`);
+            this.logClipboardError(`Failed to write content`);
             res = false;
         }
         return res;
     },
 
     /**
-     * Return a { molblock, smiles, inchi } dictionary
+     * Returns a { molblock, smiles, inchi } dictionary
      * containing the respective chemical representations
      * associated to a given mol pickle.
      * @param {UInt8Array} pickle
+     * @param {Array} formats optional, array with formats that
+     * should be retrieved ('molblock', 'smiles', 'inchi')
      * @returns {object} dictionary with chemical representations
      */
-    getChemFormatsFromPickle: async function(pickle) {
-        const rdkitModule = await this.getRDKitModule();
-        const mol = rdkitModule.get_mol_from_uint8array(pickle);
-        let molblock = '';
-        let smiles = '';
-        let inchi = '';
+    getChemFormatsFromPickle: async function(pickle, formats) {
+        formats = formats || ['molblock', 'smiles', 'inchi'];
+        const res = Object.fromEntries(formats.map(k => [k, '']));
+        const mol = await this.getMolFromPickle(pickle);
         if (mol) {
-            if (mol.is_valid()) {
-                molblock = getMolblockFromMol(mol);
+            if (res.molblock === '') {
+                res.molblock = getMolblockFromMol(mol);
+            }
+            if (res.smiles === '') {
                 try {
-                    smiles = mol.get_smiles();
+                    res.smiles = mol.get_smiles();
                 } catch(e) {
                     console.error(`Failed to generate SMILES (${e})`);
                 }
+            }
+            if (res.inchi === '') {
                 try {
-                    inchi = mol.get_inchi();
+                    res.inchi = mol.get_inchi();
                 } catch(e) {
                     console.error(`Failed to generate InChI (${e})`);
                 }
             }
             mol.delete();
         }
-        return { molblock, smiles, inchi };
+        return res;
+    },
+
+    /**
+     * Returns a JSMol from the passed pickle
+     * IMPORTANT: it is responsibility of the caller to call
+     * delete() on the returned JSMol when done with it to
+     * avoid leaking memory, as the garbage collector will NOT
+     * automatically free memory allocated by the WASM library.
+     * @param {UInt8Array} pickle
+     * @returns {JSMol|null} RDKitJS molecule
+     */
+    getMolFromPickle: async function(pickle) {
+        // block until rdkitModule is ready
+        const rdkitModule = await this.getRDKitModule();
+        let mol;
+        try {
+            mol = rdkitModule.get_mol_from_uint8array(pickle);
+        } catch(e) {
+            console.error(`Failed to generate mol from pickle (${e})`);
+        }
+        if (mol && !mol.is_valid()) {
+            console.error(`Failed to generate valid mol from pickle`);
+            mol.delete();
+            mol = null;
+        }
+        return mol;
+    },
+
+    /**
+     * Returns a dictionary with the molecule and the scaffold
+     * match (if any) associated to the passed key.
+     * IMPORTANT: it is responsibility of the caller to call
+     * delete() on the returned JSMol when done with it to
+     * avoid leaking memory, as the garbage collector will NOT
+     * automatically free memory allocated by the WASM library.
+     * @param {string} key cache key
+     * @returns {object|null} { mol: JSMol, match: object } dictionary
+     */
+    getMolAndMatchForKey: async function(key) {
+        const currentMol = this.getCurrentMol(key);
+        let res = null;
+        if (currentMol) {
+            const { pickle, match } = currentMol;
+            res = {
+                mol: await this.getMolFromPickle(pickle),
+                match,
+            };
+        }
+        return res;
+    },
+
+    /**
+     * Returns the first divId (if there are multiple) associated
+     * to the passed key. If the passed key is actually corresponding
+     * to a divId, it will be returned unchanged.
+     * @param {string} divIdOrKey cache key or divId
+     * @returns {string} divId
+     */
+    getFirstDivIdFromDivIdOrKey: function(divIdOrKey) {
+        let firstDivId = this.currentDivs().has(divIdOrKey) ? divIdOrKey : null;
+        if (!firstDivId) {
+            // note that an id may correspond to multiple divIds.
+            // we will pick the first that matches our id
+            for (const divId of this.currentDivs().keys()) {
+                if (divId.endsWith(this.getDivIdSeparator() + divIdOrKey)) {
+                    firstDivId = divId;
+                    break;
+                }
+            }
+        }
+        return firstDivId;
+    },
+
+    /**
+     * Returns the array of all divIds (if there are multiple) associated
+     * to the passed key. If the passed key is actually corresponding
+     * to a divId, a single-element array with the passed divId will be
+     * returned.
+     * @param {string} divIdOrKey cache key or divId
+     * @returns {Array<string>} array of divIds
+     */
+    getDivIdArrayFromDivIdOrKey: function(divIdOrKey) {
+        let divIdArray = this.currentDivs().has(divIdOrKey) ? [divIdOrKey] : null;
+        if (!divIdArray) {
+            divIdArray = [];
+            for (const divId of this.currentDivs().keys()) {
+                if (divId.endsWith(this.getDivIdSeparator() + divIdOrKey)) {
+                    divIdArray.push(divId);
+                }
+            }
+        }
+        return divIdArray;
+    },
+
+    /**
+     * Get an image with the 2D structure associated to the passed divId.
+     * If a key is passed, the image from the first divId associated to
+     * that key is returned.
+     * @param {string} divIdOrKey cache key or divId
+     * @param {object} opts optional dictionary with drawing options;
+     * see getImageFromMol for details
+     * @returns {string|Blob} a string if format is 'svg' or a Blob if 'png'
+     */
+    getImageFromDivIdOrKey: async function(divIdOrKey, opts) {
+        let res = Promise.resolve(null);
+        const divId = this.getFirstDivIdFromDivIdOrKey(divIdOrKey);
+        const key = this.getCacheKey(divId || divIdOrKey);
+        const { mol, match } = await this.getMolAndMatchForKey(key) || {};
+        if (mol) {
+            try {
+                const optsCopy = { ...opts };
+                optsCopy.match =  optsCopy.match || match;
+                let userOpts = {};
+                let drawOpts;
+                const div = this.getMolDiv(divId);
+                userOpts = this.getUserOptsForDiv(div || divId) || {};
+                drawOpts = this.getDrawOpts(div || divId);
+                optsCopy.userOpts = { ...userOpts, ...optsCopy.userOpts };
+                optsCopy.drawOpts = { ...drawOpts, ...optsCopy.drawOpts };
+                res = this.getImageFromMol(mol, optsCopy);
+            } catch(e) {
+                console.error(`Failed to get image for ${divId} (${e})`);
+            } finally {
+                mol.delete();
+            }
+        }
+        return res;
+    },
+
+    /**
+     * Get an image with the 2D structure associated to the passed JSMol.
+     * @param {JSMol} mol RDKitJS molecule
+     * @param {object} opts optional dictionary with drawing options:
+     * - format: 'png', 'base64png' or 'svg', defaults to 'png'
+     * - transparent: transparent background, defaults to true
+     * - width: image width, defaults to the current div width (if any)
+     * - height: image height, defaults to the current div height (if any)
+     * - scaleFac: image scale factor, defaults to the current scale factor
+     * - match: match object, defaults to the current div match
+     * - userOpts: user settings, defaults to the current div settings
+     * - drawOpts: RDKit drawOpts, defaults to the current div drawOpts
+     * @returns {string|Blob} a string if format is either 'svg' or 'base64',
+     * otherwise a Blob
+     */
+    getImageFromMol: async function(mol, opts) {
+        if (!mol) {
+            return null;
+        }
+        let {
+            width,
+            height,
+            scaleFac,
+            format,
+            match,
+            transparent,
+            userOpts,
+            drawOpts
+        } = opts;
+        let image = null;
+        width = width || DEFAULT_IMG_OPTS.width;
+        height = height || DEFAULT_IMG_OPTS.height;
+        scaleFac = scaleFac || this.copyImgScaleFac || DEFAULT_IMG_OPTS.scaleFac;
+        match = match || {};
+        transparent = transparent || typeof transparent === 'undefined';
+        userOpts = userOpts || {};
+        drawOpts = { ...this.getDefaultDrawOpts(), ...(drawOpts || {}) };
+        const isSvg = (format === 'svg');
+        const isBase64Png = (format === 'base64png');
+        if (userOpts.ABBREVIATE) {
+            mol.condense_abbreviations();
+        }
+        if (userOpts.SCAFFOLD_HIGHLIGHT) {
+            Object.assign(drawOpts, match);
+        } else {
+            delete drawOpts.atoms;
+            delete drawOpts.bonds;
+        }
+        drawOpts.addAtomIndices = userOpts.ATOM_IDX || false;
+        drawOpts.fixedBondLength *= scaleFac;
+        drawOpts.width = Math.round(width) * scaleFac;
+        drawOpts.height = Math.round(height) * scaleFac;
+        drawOpts.backgroundColour = drawOpts.backgroundColour || [1, 1, 1, 1];
+        if (transparent) {
+            drawOpts.backgroundColour[3] = 0;
+        }
+        if (isSvg) {
+            try {
+                image = this.write2DLayout(mol, drawOpts);
+            } catch(e) {
+                console.error(`Failed to generate SVG image (${e})`);
+            }
+        } else {
+            const canvas = document.createElement('canvas');
+            this.resizeMolDraw(canvas, drawOpts.width, drawOpts.height, 1);
+            try {
+                if (this.write2DLayout(mol, drawOpts, canvas) !== null) {
+                    image = isBase64Png ? canvas.toDataURL() :
+                        await new Promise(resolve => canvas.toBlob(image => resolve(image)));
+                    if (!image) {
+                        console.error(`Failed to generate PNG image`);
+                    }
+                }
+            } catch(e) {
+                console.error(`Failed to draw to canvas (${e})`);
+            }
+        }
+        return image;
     },
 
     /**
@@ -1043,92 +1311,62 @@ const Renderer = {
      * to be copied to clipboard ('png', 'svg', 'molblock')
      */
     putClipboardItem: async function(div, formats) {
-        const divRect = div.getBoundingClientRect();
+        let molMatch = {};
         this.setButtonsEnabled(div, false);
-        const userOpts = this.getUserOptsForDiv(div);
-        const { pickle, match } = this.getCurrentMol(div);
-        const rdkitModule = await this.getRDKitModule();
-        const mol = rdkitModule.get_mol_from_uint8array(pickle);
-        if (mol) {
-            if (mol.is_valid()) {
-                if (userOpts.ABBREVIATE) {
-                    mol.condense_abbreviations();
-                }
+        try {
+            const drawOpts = this.getDrawOpts(div);
+            const userOpts = this.getUserOptsForDiv(div);
+            const key = this.getCacheKey(div);
+            molMatch = await this.getMolAndMatchForKey(key) || {};
+            const { mol, match } = molMatch;
+            if (!mol) {
+                this.logClipboardError();
+            } else {
                 const hasPng = formats.includes('png');
                 const hasSvg = formats.includes('svg');
-                let drawOpts;
-                if (hasPng || hasSvg) {
-                    drawOpts = this.getDrawOpts(div);
-                    if (userOpts.SCAFFOLD_HIGHLIGHT) {
-                        Object.assign(drawOpts, match);
-                    } else {
-                        delete drawOpts.atoms;
-                        delete drawOpts.bonds;
-                    }
-                    // if the background is white, set full transparency
-                    if (drawOpts.backgroundColour.slice(0, 3).every(c => c > 0.99)) {
-                        drawOpts.backgroundColour[3] = 0;
-                    }
-                    drawOpts.addAtomIndices = userOpts.ATOM_IDX;
-                    drawOpts.fixedBondLength *= this.copyImgScaleFac;
-                    drawOpts.width = Math.round(divRect.width * this.copyImgScaleFac);
-                    drawOpts.height = Math.round(divRect.height * this.copyImgScaleFac);
-                }
                 const content = {};
-                let exc = '';
-                let res = false;
                 if (formats.includes('molblock')) {
                     const type = 'text/plain';
                     const molblock = getMolblockFromMol(mol);
                     content[type] = new Blob([molblock], { type });
-                } else if (hasSvg) {
-                    // at the moment svg+xml MIME type is not supported by browsers
-                    // so we copy as plain text. This means SVG text will clobber molblock
-                    try {
-                        const svgText = this.write2DLayout(mol, drawOpts);
-                        if (typeof svgText === 'string') {
-                            const type = 'text/plain';
-                            content[type] = new Blob([svgText], { type });
-                            await this.putClipboardContent(content);
-                            res = true;
+                }
+                if (hasPng || hasSvg) {
+                    const { width, height } = this.getDivRoundedSize(div);
+                    const opts = {
+                        width,
+                        height,
+                        // if both svg and png were specified, png is ignored
+                        format: (hasSvg ? 'svg' : 'png'),
+                        match,
+                        drawOpts,
+                        userOpts,
+                    };
+                    const image = this.getImageFromMol(mol, opts);
+                    if (!image) {
+                        this.logClipboardError();
+                    } else {
+                        if (hasSvg) {
+                            // at the moment svg+xml MIME type is not supported by browsers
+                            // so we copy as plain text. This means SVG text will clobber molblock
+                            if (typeof image === 'string') {
+                                const type = 'text/plain';
+                                content[type] = new Blob([image], { type });
+                            }
+                        } else {
+                            content['image/png'] = image;
                         }
-                    } catch(e) {
-                        exc = ` (${e})`;
-                    }
-                    if (!res) {
-                        this.logClipboardError(`generate SVG image${exc}`);
                     }
                 }
-                if (hasPng && !hasSvg) {
-                    const canvas = document.createElement('canvas');
-                    try {
-                        if (this.write2DLayout(mol, drawOpts, canvas) !== null) {
-                            canvas.toBlob(async image => {
-                                if (image) {
-                                    content['image/png'] = image;
-                                } else {
-                                    this.logClipboardError('generate PNG image');
-                                }
-                                if (Object.keys(content).length) {
-                                    await this.putClipboardContent(content);
-                                }
-                            });
-                            res = true;
-                        }
-                    } catch(e) {
-                        exc = ` (${e})`;
-                    }
-                    if (!res) {
-                        this.logClipboardError(`draw to canvas${exc}`);
-                        if (Object.keys(content).length) {
-                            await this.putClipboardContent(content);
-                        }
-                    }
+                if (Object.keys(content).length) {
+                    await this.putClipboardContent(content);
                 }
             }
-            mol.delete();
+        } catch(e) {
+            this.logClipboardError(`${e}`);
+        } finally {
+            molMatch.mol && molMatch.mol.delete();
+            this.setButtonsEnabled(div, true);
         }
-        this.setButtonsEnabled(div, true);
     },
 
     /**
@@ -1189,20 +1427,35 @@ const Renderer = {
     /**
      * Creates a button Element of the desired type
      * if it does not yet exist and returns a copy.
-     * @param {string} buttonType either 'copy' or 'cog'
+     * @param {string} type either 'copy' or 'cog'
+     * @param {string} tooltip
      * @returns {Element} HTML button element
      */
-    createButton: function(buttonType) {
+    createButton: function(type, tooltip) {
         this.buttons = this.buttons || {};
-        if (!this.buttons[buttonType]) {
+        if (!this.buttons[type]) {
+            const div = document.createElement('div');
+            div.style.position = 'relative';
             const button = document.createElement('button');
-            button.className = `button ${buttonType}`;
-            button.name = `${buttonType}-button`;
+            button.className = `button ${type}`;
+            button.name = `${type}-button`;
             button.type = 'button';
-            button.appendChild(this.getButtonIcon(buttonType));
-            this.buttons[buttonType] = button;
+            const icon = this.getButtonIcon(type);
+            button.appendChild(icon);
+            div.appendChild(button);
+            if (tooltip) {
+                const innerDiv = document.createElement('div');
+                innerDiv.className = `tooltip ${type} hidden`;
+                const span = document.createElement('span');
+                span.className = `tooltiptext ${type} hidden`;
+                const tooltipText = document.createTextNode(tooltip);
+                span.appendChild(tooltipText);
+                innerDiv.appendChild(span);
+                div.appendChild(innerDiv);
+            }
+            this.buttons[type] = div;
         }
-        return this.buttons[buttonType].cloneNode(true);
+        return this.buttons[type].cloneNode(true);
     },
 
     /**
@@ -1233,15 +1486,15 @@ const Renderer = {
      * @returns {Element} spinner div
      */
     createSpinner: function(div) {
-        if (!this.spinner) {
+        if (!this._spinner) {
             const spinner = document.createElement('div');
-            spinner.className = `${RDK_STR_RNR}spinner`;
+            spinner.className = this.getRdkStrRnrPrefix() + 'spinner';
             const spinnerWhl = document.createElement('div');
             spinnerWhl.className = 'whl';
             spinner.appendChild(spinnerWhl);
-            this.spinner = spinner;
+            this._spinner = spinner;
         }
-        const spinner = this.spinner.cloneNode(true);
+        const spinner = this._spinner.cloneNode(true);
         const divHeight = div.getBoundingClientRect().height;
         this.setSpinnerWhlRadius(spinner, divHeight)
         return spinner;
@@ -1264,24 +1517,58 @@ const Renderer = {
     },
 
     /**
+     * Returns a dictionary with current width and height
+     * associated to the passed div as rounded integers.
+     * If either dimensions is zero, the width and height set at
+     * instantiation time will be returned.
+     * @param {Element} div
+     * @returns {object} { width: integer, height: integer } dictionary
+     */
+    getDivRoundedSize: function(div) {
+        const divRect = div.getBoundingClientRect();
+        let width = Math.round(divRect.width);
+        let height = Math.round(divRect.height);
+        if (!(width > 0 && height > 0)) {
+            width = parseInt(div.getAttribute(dataAttr(this.getDivAttrs().WIDTH)) || '0');
+            height = parseInt(div.getAttribute(dataAttr(this.getDivAttrs().HEIGHT)) || '0');
+        }
+        return { width, height };
+    },
+
+    /**
+     * Resize the passed molDraw HTML Element to the passed width and height.
+     * @param {Element} molDraw HTML Element (either canvas or SVG div)
+     * @returns {object} { width: integer, height: integer } dictionary
+     */
+    resizeMolDraw: function(molDraw, width, height, scaleFac) {
+        const scale = scaleFac || window.devicePixelRatio;
+        if (!(width > 0 && height > 0)) {
+            return;
+        }
+        if (molDraw.nodeName === 'CANVAS') {
+            molDraw.width = width * scale;
+            molDraw.height = height * scale;
+        }
+        molDraw.setAttribute('style', `width: ${width}px; height: ${height}px;`);
+    },
+
+    /**
      * Creates an SVG div if it does not yet exist and
      * returns a copy of size appropriate to the container div.
      * @param {Element} div container div
      * @returns {Element} SVG div
      */
     createSvgDiv: function(div) {
-        if (!this.svgDiv) {
+        if (!this._svgDiv) {
             const svgDiv = document.createElement('div');
             svgDiv.setAttribute('name', 'mol-draw');
-            svgDiv.className = `${RDK_STR_RNR}mol-draw`;
+            svgDiv.className = this.getRdkStrRnrPrefix() + 'mol-draw';
             svgDiv.appendChild(document.createTextNode(' '));
-            this.svgDiv = svgDiv;
+            this._svgDiv = svgDiv;
         }
-        const svgDiv = this.svgDiv.cloneNode(true);
-        const divRect = div.getBoundingClientRect();
-        const width = Math.round(divRect.width);
-        const height = Math.round(divRect.height);
-        svgDiv.setAttribute('style', `width: ${width}; height: ${height};`);
+        const svgDiv = this._svgDiv.cloneNode(true);
+        const { width, height } = this.getDivRoundedSize(div);
+        this.resizeMolDraw(svgDiv, width, height);
         return svgDiv;
     },
 
@@ -1292,21 +1579,14 @@ const Renderer = {
      * @returns {Element} canvas
      */
     createCanvas: function(div) {
-        if (!this.canvas) {
+        if (!this._canvas) {
             const canvas = document.createElement('canvas');
             canvas.setAttribute('name', 'mol-draw');
-            this.canvas = canvas;
+            this._canvas = canvas;
         }
-        const canvas = this.canvas.cloneNode(true);
-        const divRect = div.getBoundingClientRect();
-        const width = Math.round(divRect.width);
-        const height = Math.round(divRect.height);
-        if (width) {
-            canvas.width = Math.round(divRect.width);
-        }
-        if (height) {
-            canvas.height = Math.round(divRect.height);
-        }
+        const canvas = this._canvas.cloneNode(true);
+        const { width, height } = this.getDivRoundedSize(div);
+        this.resizeMolDraw(canvas, width, height);
         return canvas;
     },
 
@@ -1329,7 +1609,7 @@ const Renderer = {
      */
     userTags: function() {
         if (!this._userTags) {
-            this._userTags = Object.values(this.getUserOpts()).map(item => item.tag);
+            this._userTags = Object.values(this.getAvailUserOpts()).map(item => item.tag);
         }
         return this._userTags;
     },
@@ -1339,7 +1619,7 @@ const Renderer = {
      * if it does not yet exist and returns it.
      * @returns {Array<string>} array of HTML tags
      */
-     allTags: function() {
+    allTags: function() {
         if (!this._allTags) {
             this._allTags = this.divTags().concat(this.userTags());
         }
@@ -1347,18 +1627,17 @@ const Renderer = {
     },
 
     /**
-     * Update the cache of user-defined options for a given div or divId.
+     * Update the cache of user-defined options for a given key.
      * If the value of the option is a boolean and is the same
      * as the default value for that option, the key for that option
      * is removed from the cache. If no keys are left, the whole entry
      * for that div is removed.
      * Note that the div is identified by a key computed by getCacheKey().
-     * @param {Element|string} div
+     * @param {string} key cache key
      * @param {string} userOpt name of the user-defined option
      * @param {boolean|string|null} value value to be stored
      */
-    updateUserOptCache: function(div, userOpt, value) {
-        const key = this.getCacheKey(div);
+    updateUserOptCache: function(key, userOpt, value) {
         const cachedEntry = this.userOptCache[key] || {};
         if (userOpt) {
             const isBool = (typeof value === 'boolean');
@@ -1378,17 +1657,15 @@ const Renderer = {
 
     /**
      * Get the value of a user-defined boolean option from cache
-     * for a given div.
-     * Note that the div is identified by a key computed by getCacheKey().
+     * for a given key.
      * If the cached value does not exist, returns unspecified
-     * @param {Element} div
+     * @param {string} key cache key
      * @param {string} userOpt name of the user-defined option
      * @returns {boolean|string} cached value, or unspecified if there
      * is no value associated to userOpt in the cache
      *
      */
-    getCachedValue: function(div, userOpt) {
-        const key = this.getCacheKey(div);
+    getCachedValue: function(key, userOpt) {
         const cachedEntry = this.userOptCache[key];
         let cachedValue;
         if (cachedEntry) {
@@ -1399,62 +1676,71 @@ const Renderer = {
 
     /**
      * Get the value of a user-defined boolean option from cache
-     * for a given div.
+     * for a given div or divId.
      * Note that the div is identified by a key computed by getCacheKey().
-     * If no cached value exists, the value is read from the div.
-     * @param {Element} div
+     * If no cached value exists, the value read from the div is returned,
+     * or false if a divId is passed.
+     * @param {Element|string} div div or divId
      * @param {string} userOpt name of the user-defined option
      * @returns {boolean} true if the option is checked,
-     * false if not
+     * false if not checked or not found
      */
     getBoolOpt: function(div, userOpt) {
-        let cachedValue = this.getCachedValue(div, userOpt);
-        return (typeof cachedValue !== 'undefined' ? cachedValue :
-            this.toBool(div.getAttribute(dataAttr(userOpt))));
-    },
-
-    /**
-     * Convert HTML attribute to bool.
-     * @param {string} v HTML value obtained calling Element.getAttribute
-     * @returns true if v is a string and not falsy
-     */
-    toBool: (v) => {
-        let res = false;
-        if (typeof v === 'string') {
-            v = v.toLowerCase();
-            res = (v !== 'false' && v !== 'null' && v !== '0');
+        const key = this.getCacheKey(div);
+        let res = this.getCachedValue(key, userOpt);
+        if (typeof res === 'undefined' && typeof div !== 'string') {
+            res = this.toBool(div.getAttribute(dataAttr(userOpt)));
         }
         return res;
     },
 
     /**
-     * Returns true if the given div was previously found
+     * Convert HTML attribute to bool.
+     * @param {string} v HTML value obtained calling Element.getAttribute
+     * @returns true if v is a string and truthy, false if v is a string
+     * and falsy, otherwise undefined
+     */
+    toBool: (v) => {
+        let res;
+        if (typeof v === 'string') {
+            v = v.toLowerCase();
+            if (v === 'false' || v === '0' || v === 'null') {
+                res = false;
+            } else if (v === 'true' || v === '1' || v === '') {
+                res = true;
+            }
+        }
+        return res;
+    },
+
+    /**
+     * Returns true if the given key was previously found
      * not to match the given scaffold definition.
-     * @param {Element} div
+     * @param {stringh} key cache key
      * @param {string} scaffold scaffold definition (SMILES or CTAB)
      * @returns {boolean} true if the given div was previously
      * found not to match this scaffold, false if not
      */
-    getFailsMatch: function(div, scaffold) {
-        return (this.getCachedValue(div, NO_MATCH) === scaffold);
+    getFailsMatch: function(key, scaffold) {
+        return (scaffold && this.getCachedValue(key, NO_MATCH) === scaffold);
     },
 
     /**
-     * Mark the given div as failing to match the given
+     * Mark the given key as failing to match the given
      * scaffold definition.
-     * @param {Element} div
+     * @param {string} key cache key
      * @param {string} scaffold scaffold definition (SMILES or CTAB)
      */
-    setFailsMatch: function(div, scaffold) {
-        this.updateUserOptCache(div, NO_MATCH, scaffold);
+    setFailsMatch: function(key, scaffold) {
+        this.updateUserOptCache(key, NO_MATCH, scaffold);
     },
 
     /**
-     * Clear the 'fails scaffold match' flag on the given div.
-     * @param {Element} div
+     * Clear the 'fails scaffold match' flag on the given key.
+     * @param {string} key cache key
      */
-    clearFailsMatch: function(div) {
-        this.setFailsMatch(div, null);
+    clearFailsMatch: function(key) {
+        this.setFailsMatch(key, null);
     },
 
     /**
@@ -1476,8 +1762,9 @@ const Renderer = {
         }
         this.scheduler().mainQueue.abortJobs(divId);
         this.currentDivs().delete(divId);
-        this.decRef(divId);
-        this.updateUserOptCache(divId);
+        const key = this.getCacheKey(divId);
+        this.decRef(key);
+        this.updateUserOptCache(key);
     },
 
     /**
@@ -1490,34 +1777,57 @@ const Renderer = {
      * - field is the name of the attribute changed by the user
      * - isChecked is the boolean value of the attribute
      * - molblock is the current set of coordinates
-     * @param {Element} div
+     * @param {string} divId
      * @param {function} userOptsCallback optional callback
      */
     updateMolDrawDiv: function(divId, userOptsCallback) {
-        this.incRef(divId);
         const div = this.getMolDiv(divId);
         if (!div) {
             return;
         }
+        const key = this.getCacheKey(divId);
+        this.setRendererCss();
         this.getSpinner(div);
-        this.clearCurrentMol(div);
+        this.clearCurrentMol(key);
         const divAttrs = Object.fromEntries(this.allTags().map(tag =>
             [tag, div.getAttribute(dataAttr(tag))]));
+        const { width, height } = this.getDivRoundedSize(div);
+        if (width > 0 && height > 0) {
+            divAttrs[this.getDivAttrs().WIDTH] = width;
+            divAttrs[this.getDivAttrs().HEIGHT] = height;
+        }
         divAttrs.userOptsCallback = userOptsCallback;
         this.currentDivs().set(divId, divAttrs);
-        this.getButtonTypes().forEach(buttonType => {
-            let button = this.getButton(div, buttonType);
-            const shouldHide = this.toBool(divAttrs[`hide-${buttonType}`]);
-            if (!shouldHide && !button) {
-                button = this.createButton(buttonType);
-                button.onclick = (e) => this.onButtonAction(e, buttonType, div);
-                div.appendChild(button);
-            } else if (shouldHide && button) {
-                button.remove();
+        let molDraw = this.getMolDraw(div);
+        this.getButtonTypes().forEach(({ type, tooltip }) => {
+            let buttonDiv = this.getButton(div, type);
+            const shouldHide = this.toBool(divAttrs[`hide-${type}`]);
+            if (!shouldHide && !buttonDiv) {
+                buttonDiv = this.createButton(type, tooltip);
+                const button = buttonDiv.firstChild;
+                const tooltipText = buttonDiv.lastChild.firstChild;
+                if (tooltipText) {
+                    button.onmouseenter = (e) => {
+                        if (!(this.settings?.isVisible &&
+                            divId === this.settings.currentDivId &&
+                            e?.target?.className.includes('cog'))) {
+                            tooltipText.className = `tooltiptext ${type} visible`;
+                        }
+                    }
+                    button.onmouseleave = () => {
+                        tooltipText.className = `tooltiptext ${type} hidden`;
+                    }
+                }
+                button.onclick = (e) => {
+                    this.onButtonAction(e, type, div);
+                    button.onmouseleave && button.onmouseleave();
+                };
+                div.insertBefore(buttonDiv, molDraw);
+            } else if (shouldHide && buttonDiv) {
+                buttonDiv.remove();
             }
         });
         const useSvg = this.toBool(divAttrs[this.getDivAttrs().USE_SVG]);
-        let molDraw = this.getMolDraw(div);
         if (molDraw) {
             const isSvg = (molDraw.nodeName === 'DIV');
             if (isSvg ^ useSvg) {
@@ -1537,9 +1847,10 @@ const Renderer = {
     /**
      * For a given div, it will check if the div needs to be updated
      * and will do so if needed.
-     * @param {Element} div
+     * @param {string} divId
+     * @param {function} userOptsCallback optional callback
      */
-     updateMolDrawDivIfNeeded: function(divId, userOptsCallback) {
+    updateMolDrawDivIfNeeded: function(divId, userOptsCallback) {
         const div = this.getMolDiv(divId);
         if (!div) {
             return;
@@ -1551,13 +1862,27 @@ const Renderer = {
             // be drawn
             currentDivValue = this.currentDivs().get(divId);
             if (!currentDivValue) {
+                const key = this.getCacheKey(divId);
+                this.incRef(key);
                 shouldDraw = true;
             }
         }
         // if it was seen before, we may still need to redraw
         // if some attribute changed
+        const allTags = [...this.allTags()];
         if (!shouldDraw) {
-            shouldDraw = this.allTags().some(tag => {
+            const { width, height } = this.getDivRoundedSize(div);
+            if (!(width > 0 && height > 0)) {
+                delete allTags[this.getDivAttrs().WIDTH];
+                delete allTags[this.getDivAttrs().HEIGHT];
+            } else if (currentDivValue.width != width || currentDivValue.height != height) {
+                shouldDraw = true;
+                this.setSpinnerWhlRadius(this.getSpinner(div), height);
+                this.getMolDraw(div).innerHTML = '';
+            }
+        }
+        if (!shouldDraw) {
+            shouldDraw = allTags.some(tag => {
                 const divAttrValue = div.getAttribute(dataAttr(tag));
                 const currentDivAttrValue = currentDivValue[tag];
                 return (typeof currentDivAttrValue !== 'undefined' && divAttrValue !== currentDivAttrValue);
@@ -1594,10 +1919,10 @@ const Renderer = {
      */
     userOptCache: {},
 
-     /**
-      * Current scaling factor used for images copied to clipboard.
-      */
-    copyImgScaleFac: 1,
+    /**
+     * Current scaling factor used for images copied to clipboard.
+     */
+    copyImgScaleFac: DEFAULT_IMG_OPTS.scaleFac,
 };
 
 export default Renderer;

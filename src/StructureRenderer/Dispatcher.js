@@ -30,7 +30,13 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-import workerMain from './worker.js';
+import {
+    getMolSafe,
+    getNormPickle,
+    getPickleSafe,
+    setNewCoords,
+    getDepiction
+} from './utils.js';
 
 class Dispatcher {
     constructor(id, minimalLibPath) {
@@ -49,10 +55,27 @@ class Dispatcher {
      getWorkerBlob(minimalLibPath) {
         return [
 `importScripts('${minimalLibPath}/RDKit_minimal.js');
-rdkitReady = initRDKitModule({
+const rdkitReady = initRDKitModule({
     locateFile: (path) => '${minimalLibPath}/' + path,
 });
-const main = ${workerMain.toString()};
+const ${getPickleSafe.name} = ${getPickleSafe};
+const ${getMolSafe.name} = ${getMolSafe};
+const ${getNormPickle.name} = ${getNormPickle};
+const ${setNewCoords.name} = ${setNewCoords};
+const getDepiction = ${getDepiction};
+const main = (rdkitReady, dispatcherId) => {
+    onmessage = ({ data }) => rdkitReady.then(rdkitModule => {
+        const { wPort } = data;
+        if (!wPort) {
+            return;
+        }
+        delete data.wPort;
+        data.rdkitModule = rdkitModule;
+        wPort.postMessage(getDepiction(data));
+        wPort.close();
+    });
+    console.log('worker ' + dispatcherId.toString() + ' ready');
+};
 main(rdkitReady, ${this.id});`
         ];
     }

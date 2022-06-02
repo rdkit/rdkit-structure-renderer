@@ -114,13 +114,14 @@ class SettingsDialog {
     /**
      * Fetch the checked status of the checkbox field
      * and store it in the cache.
-     * @param {string}field tag identifying the checkbox
+     * @param {string} field tag identifying the checkbox
      * @returns {boolean} whether the checkbox is checked
      */
     fetchAndStoreBoolOpt(field) {
         const isChecked = this.renderOpt[field].checked
         // remember the user setting for this field/div
-        this.renderer.updateUserOptCache(this.molDiv, field, isChecked);
+        const key = this.renderer.getCacheKey(this.molDiv);
+        this.renderer.updateUserOptCache(key, field, isChecked);
         return isChecked;
     }
 
@@ -177,9 +178,10 @@ class SettingsDialog {
     async onRenderingChanged(field) {
         const div = this.molDiv;
         const divId = this.renderer.getDivId(div)
+        const key = this.renderer.getCacheKey(div);
         const currentDiv = this.renderer.currentDivs().get(divId) || {};
         const isChecked = this.fetchAndStoreBoolOpt(field);
-        const userOpts = this.renderer.getUserOpts();
+        const userOpts = this.renderer.getAvailUserOpts();
         let func = () => null;
         const isScaffoldAlign = (field === userOpts.SCAFFOLD_ALIGN.tag);
         const recompute2DTag = userOpts.RECOMPUTE2D.tag;
@@ -189,7 +191,7 @@ class SettingsDialog {
         if (isScaffoldAlign) {
             if (isChecked) {
                 this.renderOpt[recompute2DTag].checked = false;
-                this.renderer.updateUserOptCache(div, recompute2DTag, null);
+                this.renderer.updateUserOptCache(key, recompute2DTag, null);
             }
             const recompute2DAction = isChecked ? this.disableAction : this.enableAction;
             recompute2DAction(this.renderOpt[recompute2DTag]);
@@ -208,7 +210,7 @@ class SettingsDialog {
             if (!currentDiv.childQueue) {
                 currentDiv.childQueue = this.renderer.scheduler().mainQueue.addChild(divId);
             }
-            this.renderer.clearCurrentMol(div);
+            this.renderer.clearCurrentMol(key);
             molblock = await this.renderer.draw(div, true);
             this.enableScaffoldOpts(div);
             // call the callback (if any) to signal
@@ -314,8 +316,9 @@ class SettingsDialog {
      */
     enableScaffoldOpts(div) {
         const scaffold = this.renderer.getScaffold(div);
-        const hasScaffold = scaffold && !this.renderer.getFailsMatch(div, scaffold);
-        const userOpts = this.renderer.getUserOpts();
+        const key = this.renderer.getCacheKey(div);
+        const hasScaffold = scaffold && !this.renderer.getFailsMatch(key, scaffold);
+        const userOpts = this.renderer.getAvailUserOpts();
         // enable scaffold alignment/highlighting only if a scaffold
         // definition is available
         const opts = [userOpts.SCAFFOLD_ALIGN, userOpts.SCAFFOLD_HIGHLIGHT]
@@ -327,14 +330,15 @@ class SettingsDialog {
         const enableAndMaybeCheck = (tag) => {
             const control = this.renderOpt[tag];
             if (control.hasAttribute('disabled')) {
-                const isChecked = this.renderer.getBoolOpt(div, tag);
+                const isChecked = this.renderer.getBoolOpt(div, tag) || false;
                 control.checked = isChecked;
             }
             this.enableAction(control);
         };
         const alignHighlightAction = hasScaffold ? enableAndMaybeCheck : disableAndUncheck;
         opts.forEach(opt => alignHighlightAction(opt.tag));
-        const shouldAlign = hasScaffold && this.renderer.getBoolOpt(div, userOpts.SCAFFOLD_ALIGN.tag);
+        const shouldAlign = hasScaffold && (this.renderer.getBoolOpt(
+            div, userOpts.SCAFFOLD_ALIGN.tag) || false);
         // enable recompute2D only if alignment to scaffold is unchecked
         const recompute2DAction = shouldAlign ? this.disableAction : this.enableAction;
         recompute2DAction(this.renderOpt[userOpts.RECOMPUTE2D.tag]);
@@ -342,19 +346,20 @@ class SettingsDialog {
 
     /**
      * Set the molDiv the SettingsDialog is currently associated with.
-     * @param {object} molDiv HTML DIV element
+     * @param {object} div HTML DIV element
      */
-    async setMolDiv(molDiv) {
-        this.molDiv = molDiv;
+    async setMolDiv(div) {
+        this.molDiv = div;
+        const key = this.renderer.getCacheKey(div);
         this.renderer.getCheckableUserOpts().forEach(opt =>
-            this.renderOpt[opt.tag].checked = this.renderer.getBoolOpt(molDiv, opt.tag));
-        this.enableScaffoldOpts(molDiv);
-        const relatedNodes = this.renderer.getRelatedNodes(molDiv);
+            this.renderOpt[opt.tag].checked = this.renderer.getBoolOpt(div, opt.tag) || false);
+        this.enableScaffoldOpts(div);
+        const relatedNodes = this.renderer.getRelatedNodes(div);
         const dialogRelatives = Object.fromEntries(
             Object.entries(relatedNodes).map(([k, cssSelector]) => {
                 let res;
                 if (cssSelector) {
-                    res = molDiv.closest(cssSelector);
+                    res = div.closest(cssSelector);
                 } else if (cssSelector !== null) {
                     res = null;
                 }
@@ -366,13 +371,13 @@ class SettingsDialog {
         this.dialogRelatives = dialogRelatives;
         this.clickNode = document.body;
         this.buttons = {};
-        this.renderer.getButtonTypes().forEach(buttonType => {
-            const button = this.renderer.getButton(molDiv, buttonType);
+        this.renderer.getButtonTypes().forEach(({ type }) => {
+            const button = this.renderer.getButton(div, type);
             if (button) {
-                this.buttons[buttonType] = button;
+                this.buttons[type] = button;
             }
         });
-        const formats = await this.renderer.getChemFormatsFromPickle(this.renderer.getCurrentMol(molDiv).pickle);
+        const formats = await this.renderer.getChemFormatsFromPickle(this.renderer.getCurrentMol(key).pickle);
         Object.entries(formats).forEach(([format, value]) => this.textArea[format].value = value);
     }
 
@@ -383,8 +388,8 @@ class SettingsDialog {
      */
     setButtonsAlwaysVisible(alwaysVisible) {
         const attr = (alwaysVisible ? ' always-visible' : '');
-        Object.entries(this.buttons).forEach(([buttonType, button]) =>
-            button.className = `button ${buttonType}${attr}`);
+        Object.entries(this.buttons).forEach(([type, button]) =>
+            button.className = `button ${type}${attr}`);
     }
 
     /**

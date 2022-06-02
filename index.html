@@ -149,7 +149,7 @@
                     </td>
                     <td>
                         <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-11"
-                            data-mol="N1C=CC(=O)c2ccccc12" data-hide-cog>
+                            data-mol="N1C=CC(=O)c2ccccc12" data-hide-cog data-recompute2d>
                         </div>
                     </td>
                 </tr>
@@ -199,7 +199,7 @@
                         Canvas align and highlight<br>scaffold
                     </th>
                     <th>
-                        SVG align and highlight<br>scaffold
+                        SVG align (no straighten)<br>and highlight scaffold
                     </th>
                     <th>
                         Canvas CTAB scaffold<br>no straighten, no cog icon
@@ -208,14 +208,14 @@
                 <tr>
                     <td>
                         <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-15"
-                            data-scaffold-highlight data-scaffold-align
+                            data-scaffold-highlight data-scaffold-align data-no-scaffold-straighten
                             data-scaffold="N1C=CC(=O)c2ccccc12"
                             data-mol="C1CC1N2C=C(C(=O)C3=CC(=C(C=C32)N4CCNCC4)F)C(=O)O">
                         </div>
                     </td>
                     <td>
                         <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-16"
-                            data-scaffold-highlight data-scaffold-align data-use-svg
+                            data-scaffold-highlight data-scaffold-align data-no-scaffold-straighten data-use-svg
                             data-scaffold="N1C=CC(=O)c2ccccc12"
                             data-mol="C1CC1N2C=C(C(=O)C3=CC(=C(C=C32)N4CCNCC4)F)C(=O)O">
                         </div>
@@ -260,7 +260,7 @@
                     <td>
                         <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-20"
                             data-mol="[nH]1cnc2ccccc12"
-                            data-hide-cog data-hide-copy>
+                            data-hide-cog data-hide-copy data-recompute2d>
                         </div>
                     </td>
                 </tr>
@@ -296,7 +296,7 @@
                     </td>
                     <td>
                         <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-23"
-                            data-mol="n1cnc2ccccc12">
+                            data-mol="n1cnc2ccccc12" data-recompute2d>
                         </div>
                     </td>
                 </tr>
@@ -359,7 +359,79 @@
                     </td>
                     <td>
                         <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-28"
-                            data-mol="n1ccccc1">
+                            data-mol="n1ccccc1" data-recompute2d>
+                        </div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+        <table>
+            <tbody>
+                <tr>
+                    <th>
+                        Canvas align, highlight<br>scaffold and abbreviate
+                    </th>
+                    <th>
+                        SVG align, highlight<br>scaffold, and abbreviate
+                    </th>
+                    <th>
+                        Canvas SMILES scaffold,<br>matches, does not include<br>abbreviation
+                    </th>
+                </tr>
+                <tr>
+                    <td>
+                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-29"
+                            data-scaffold-highlight data-scaffold-align data-abbreviate
+                            data-scaffold="[nH]1cnc2ccccc12"
+                            data-mol="O=C(O)C(c1ccc(cc1)CCN4CCC(c2nc3ccccc3n2CCOCC)CC4)(C)C">
+                        </div>
+                    </td>
+                    <td>
+                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-30"
+                            data-scaffold-highlight data-scaffold-align data-abbreviate data-use-svg
+                            data-scaffold="[nH]1cnc2ccccc12"
+                            data-mol="O=C(O)C(c1ccc(cc1)CCN4CCC(c2nc3ccccc3n2CCOCC)CC4)(C)C">
+                        </div>
+                    </td>
+                    <td>
+                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-31"
+                            data-mol="[nH]1cnc2ccccc12" data-recompute2d>
+                        </div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+        <table>
+            <tbody>
+                <tr>
+                    <th>
+                        Canvas align, highlight<br>scaffold and abbreviate
+                    </th>
+                    <th>
+                        SVG align, highlight<br>scaffold, and abbreviate
+                    </th>
+                    <th>
+                        Canvas SMILES scaffold,<br>matches, includes<br>abbreviation
+                    </th>
+                </tr>
+                <tr>
+                    <td>
+                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-32"
+                            data-scaffold-highlight data-scaffold-align data-abbreviate
+                            data-scaffold="CCOCCn1cnc2ccccc12"
+                            data-mol="O=C(O)C(c1ccc(cc1)CCN4CCC(c2nc3ccccc3n2CCOCC)CC4)(C)C">
+                        </div>
+                    </td>
+                    <td>
+                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-33"
+                            data-scaffold-highlight data-scaffold-align data-abbreviate data-use-svg
+                            data-scaffold="CCOCCn1cnc2ccccc12"
+                            data-mol="O=C(O)C(c1ccc(cc1)CCN4CCC(c2nc3ccccc3n2CCOCC)CC4)(C)C">
+                        </div>
+                    </td>
+                    <td>
+                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-34"
+                            data-mol="CCOCCn1cnc2ccccc12" data-recompute2d>
                         </div>
                     </td>
                 </tr>

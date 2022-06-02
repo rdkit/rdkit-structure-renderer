@@ -32,362 +32,347 @@
 
 import { RDK_STR_RNR } from './constants.js';
 
-const css =
-`.${RDK_STR_RNR}mol-container {
-    display: block;
-    position: relative;
-    background-color: white;
-    z-index: 1;
-}
-
-@-webkit-keyframes spin {
-    0% { -webkit-transform: rotate(0deg); }
-    100% { -webkit-transform: rotate(360deg); }
-}
-
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
-
-.${RDK_STR_RNR}spinner {
-    display: none;
-    background-color: white;
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    z-index: 11;
-}
-
-.${RDK_STR_RNR}spinner .whl {
-    display: block;
-    margin: auto;
-    border-style: solid;
-    border-color: #f1f1f1;
-    border-top-color: #3498db;
-    border-radius: 50%;
-    -webkit-animation: spin 1s linear infinite;
-    animation: spin 1s linear infinite;
-}
-
-.${RDK_STR_RNR}mol-draw {
-    position: absolute;
-}
-
-.${RDK_STR_RNR}mol-container .button {
-    position: absolute;
-    top: 1px;
-    opacity: 0;
-    z-index: 2;
-    background-color: white;
-    border: 0;
-    cursor: pointer;
-    outline: none;
-    padding: 0;
-    font-size: 12px;
-    line-height: 1;
-    transition-duration: 0.2s;
-} 
-
-.${RDK_STR_RNR}mol-container .copy {
-    left: 1px;
-} 
-
-.${RDK_STR_RNR}mol-container .cog {
-    right: 1px;
-} 
-
-.${RDK_STR_RNR}button-icon {
-    width: 10px;
-    height: 10px;
-} 
-
-.${RDK_STR_RNR}button-icon img {
-    vertical-align: baseline;
-}
-
-/* turn SVG dark gray (#A9A9A9) upon hovering, see https://codepen.io/sosuke/pen/Pjoqqp */
-.${RDK_STR_RNR}button-icon:hover {
-    filter: invert(62%) sepia(0%) saturate(35%) hue-rotate(144deg) brightness(107%) contrast(98%);
-    transition-duration: 0.2s;
-}
-
-.${RDK_STR_RNR}mol-container:hover .button {
-    opacity: 1;
-}
-
-.${RDK_STR_RNR}mol-container .always-visible {
-    opacity: 1;
-} 
-
-.${RDK_STR_RNR}dialog {
-    display: block;
-    position: absolute;
-    background: white;
-    border: 2px solid black;
-    width: min-content;
-    height: min-content;
-    z-index: 2001;
-    color: black;
-    font-size: 12px;
-    font-family: Arial, Helvetica, sans-serif;
-    white-space: nowrap;
-    font-weight: normal;
-}
-
-.${RDK_STR_RNR}title {
-    display: inline-block;
-    margin: 5px 8px 0px 8px;
-    font-weight: bold;
-    line-height: 1.3;
-}
-
-.${RDK_STR_RNR}checkbox {
-    color: black;
-    display: block;
-    position: relative;
-    margin: 3px 0px 0px 8px;
-    padding: 0px 0px 0px 20px;
-    cursor: pointer;
-    font-weight: normal;
-    line-height: 1.3;
-}
-
-.${RDK_STR_RNR}checkbox[disabled] {
-    color: lightgray;
-}
-
-.${RDK_STR_RNR}checkbox input {
-    margin: 0;
-    visibility: hidden;
-    cursor: pointer;
-}
-
-.${RDK_STR_RNR}checkbox .box {
-    position: absolute;
-    top: 1px;
-    left: 0px;
-    height: 9px;
-    width: 9px;
-    background-color: white;
-    border: 2px solid black;
-    box-sizing: content-box;
-}
-
-.${RDK_STR_RNR}checkbox[disabled] .box {
-    border: 2px solid lightgray;
-}
-
-.${RDK_STR_RNR}checkbox:hover:not([disabled]) input ~ .box {
-    background-color: lightgray;
-}
-
-.${RDK_STR_RNR}checkbox:hover:not([disabled]) input:checked ~ .box {
-    background-color: blue;
-}
-
-.${RDK_STR_RNR}checkbox input:checked ~ .box {
-    background-color: blue;
-    border: solid blue;
-    border-width: 2px;
-    transition-duration: 0.2s;
-}
-
-.${RDK_STR_RNR}checkbox input ~ .mark {
-    display: none;
-}
-
-.${RDK_STR_RNR}checkbox input:checked ~ .mark {
-    display: block;
-    position: absolute;
-    left: 4px;
-    top: 1px;
-    width: 3px;
-    height: 8px;
-    border: solid white;
-    padding: 0;
-    background-color: transparent;
-    border-width: 0 2px 2px 0;
-    transform: rotate(45deg);
-    box-sizing: content-box;
-}
-
-.${RDK_STR_RNR}formats {
-    display: block;
-    position: relative;
-    margin: 3px 8px 3px 8px;
-    padding: 0;
-    cursor: default;
-    font-size: 12px;
-}
-
-.${RDK_STR_RNR}formats .label {
-    display: inline-block;
-    box-sizing: border-box;
-    cursor: pointer;
-    font-weight: bold;
-    background-color: white;
-    margin: 0;
-    line-height: 1.3;
-}
-
-.${RDK_STR_RNR}formats .chevron-label {
-    padding: 3px 0px 0px 20px;
-}
-
-.${RDK_STR_RNR}formats input[type=checkbox] {
-    visibility: hidden;
-    cursor: pointer;
-}
-
-.${RDK_STR_RNR}formats input ~ .chevron {
-    position: absolute;
-    height: 6px;
-    width: 6px;
-    cursor: pointer;
-    background-color: white;
-    border: solid black;
-    border-width: 0 2px 2px 0;
-    box-sizing: content-box;
-}
-
-.${RDK_STR_RNR}formats input ~ .chevron:hover {
-    border-color: darkgray;
-    transition-duration: 0.2s;
-}
-
-.${RDK_STR_RNR}formats input ~ .collapsed {
-    display: block;
-    top: 7px;
-    left: 2px;
-    transform: rotate(-45deg);
-}
-
-.${RDK_STR_RNR}formats input:checked ~ .collapsed {
-    display: none;
-}
-
-.${RDK_STR_RNR}formats input ~ .expanded {
-    display: none;
-    top: 5px;
-    left: 2px;
-    transform: rotate(45deg);
-}
-
-.${RDK_STR_RNR}formats input:checked ~ .expanded {
-    display: block;
-}
-
-.${RDK_STR_RNR}formats input:checked ~ .spinner {
-    display: block;
-    position: relative;
-    z-index: 11;
-}
-
-.${RDK_STR_RNR}formats input ~ .spinner {
-    display: none;
-}
-
-.${RDK_STR_RNR}formats input ~ .label {
-    display: none;
-}
-
-.${RDK_STR_RNR}formats input ~ .table {
-    display: none;
-}
-
-.${RDK_STR_RNR}formats input:checked ~ .label {
-    display: inline-block;
-    margin: 8px 0 3px 0;
-}
-
-.${RDK_STR_RNR}formats input:checked ~ .table {
-    display: table;
-    margin: 8px 0px 0px 0px;
-    border-collapse: collapse;
-    width: 100%;
-    line-height: 1.3;
-}
-
-.${RDK_STR_RNR}formats .scale {
-    display: inline-block;
-    border-width: 2px;
-    border-color: black;
-    width: 3em;
-    visibility: visible;
-    cursor: auto;
-}
-
-.${RDK_STR_RNR}formats .fmtcell {
-    border: none;
-    padding: 0 0.5em 0 0;
-    vertical-align: middle;
-}
-
-.${RDK_STR_RNR}formats .scalecell {
-    border: none;
-    padding: 0 0 4px 0;
-    text-align: right;
-    vertical-align: middle;
-}
-
-.${RDK_STR_RNR}formats .copy {
-    display: inline-block;
-    border: none;
-    outline: none;
-    background-color: transparent;
-    padding: 0px 4px 2px 4px;
-    cursor: pointer;
-}
-
-/* turn SVG light gray (#D3D3D3) when disabled, see https://codepen.io/sosuke/pen/Pjoqqp */
-.${RDK_STR_RNR}formats .disabled-icon {
-    filter: invert(96%) sepia(0%) saturate(0%) hue-rotate(182deg) brightness(92%) contrast(86%);
-}
-
-.${RDK_STR_RNR}formats .disabled-label {
-    color: lightgray;
-}
-
-.${RDK_STR_RNR}formats input ~ .box {
-    display: none;
-}
-
-.${RDK_STR_RNR}formats input:checked ~ .box {
-    display: block;
-    padding: 4px;
-    background-color: white;
-    border: solid black;
-    border-width: 2px;
-    resize: vertical;
-    scrollbar-width: thin;
-    cursor: auto;
-    font-family: monospace;
-    line-height: normal;
-}
-
-.${RDK_STR_RNR}formats input:checked ~ .box::-webkit-scrollbar {
-    width: 0.8em;
-    height: 0.8em;
-    background: #f1f1f1;
-}
-
-.${RDK_STR_RNR}formats input:checked ~ .box::-webkit-scrollbar-thumb {
-    background: #c1c1c1;
-}
-
-.${RDK_STR_RNR}formats input:checked ~ .smilesinchi {
-    min-height: 2em;
-    max-height: 4em;
-    height: 2em;
-    overflow-y: scroll;
-}
-
-.${RDK_STR_RNR}formats input:checked ~ .molblock {
-    min-height: 6em;
-    max-height: 12em;
-    height: 6em;
-    overflow: scroll;
-}`;
+const css = {
+    [`.${RDK_STR_RNR}mol-container`]: {
+        display: 'block',
+        position: 'relative',
+        backgroundColor: 'white',
+        zIndex: 1,
+    },
+    '@-webkit-keyframes spin': {
+        '0%': {
+            WebkitTransform: 'rotate(0deg)',
+        },
+        '100%': {
+            WebkitTransform: 'rotate(360deg)',
+        },
+    },
+    '@keyframes spin': {
+        '0%': {
+            transform: 'rotate(0deg)',
+        },
+        '100%': {
+            transform: 'rotate(360deg)',
+        }
+    },
+    [`.${RDK_STR_RNR}spinner`]: {
+        display: 'none',
+        backgroundColor: 'white',
+        position: 'absolute',
+        width: '100%',
+        height: '100%',
+        zIndex: 11,
+    },
+    [`.${RDK_STR_RNR}spinner .whl`]: {
+        display: 'block',
+        margin: 'auto',
+        borderStyle: 'solid',
+        borderColor: '#f1f1f1',
+        borderTopColor: '#3498db',
+        borderRadius: '50%',
+        WebkitAnimation: 'spin 1s linear infinite',
+        animation: 'spin 1s linear infinite',
+    },
+    [`.${RDK_STR_RNR}mol-draw`]: {
+        position: 'absolute',
+    },
+    [`.${RDK_STR_RNR}mol-container .button`]: {
+        position: 'absolute',
+        top: '1px',
+        opacity: 0,
+        zIndex: 1,
+        backgroundColor: 'white',
+        border: 0,
+        cursor: 'pointer',
+        outline: 'none',
+        padding: 0,
+        fontSize: '12px',
+        lineHeight: 1,
+        transitionDuration: '0.2s',
+    },
+    [`.${RDK_STR_RNR}mol-container .tooltip`]: {
+        position: 'absolute',
+        display: 'inline-block',
+        whiteSpace: 'nowrap',
+        opacity: 1,
+        visibility: 'hidden',
+        zIndex: 2001,
+    },
+    [`.${RDK_STR_RNR}mol-container .tooltip .tooltiptext`]: {
+        backgroundColor: 'grey',
+        color: 'white',
+        textAlign: 'center',
+        padding: '5px 5px',
+        borderRadius: '6px',
+        position: 'absolute',
+        fontSize: '11px',
+    },
+    [`.${RDK_STR_RNR}mol-container .tooltip .copy`]: {
+        transform: 'translateX(calc(-50% + 5px)) translateY(-110%)',
+    },
+    [`.${RDK_STR_RNR}mol-container .tooltip .cog`]: {
+        transform: 'translateX(calc(50% - 5px)) translateY(-110%)',
+    },
+    [`.${RDK_STR_RNR}mol-container .tooltip .visible`]: {
+        visibility: 'visible',
+    },
+    [`.${RDK_STR_RNR}mol-container .tooltip .hidden`]: {
+        visibility: 'hidden',
+    },
+    [`.${RDK_STR_RNR}mol-container .cog`]: {
+        right: '1px',
+    },
+    [`.${RDK_STR_RNR}mol-container .copy`]: {
+        left: '1px',
+    },
+    [`.${RDK_STR_RNR}button-icon`]: {
+        color: 'black',
+        fill: 'currentColor',
+        display: 'inline-block',
+        width: '10px',
+        height: '10px',
+    },
+    [`.${RDK_STR_RNR}button-icon:hover`]: {
+        color: '#A9A9A9',
+    },
+    [`.${RDK_STR_RNR}button-icon img`]: {
+        verticalAlign: 'baseline',
+    },
+    [`.${RDK_STR_RNR}mol-container:hover .button`]: {
+        opacity: 1,
+    },
+    [`.${RDK_STR_RNR}mol-container .always-visible`]: {
+        opacity: 1,
+    },
+    [`.${RDK_STR_RNR}dialog`]: {
+        display: 'block',
+        position: 'absolute',
+        background: 'white',
+        border: '2px solid black',
+        width: 'min-content',
+        height: 'min-content',
+        zIndex: 2001,
+        color: 'black',
+        fontSize: '12px',
+        fontFamily: 'Arial, Helvetica, sans-serif',
+        whiteSpace: 'nowrap',
+        fontWeight: 'normal',
+    },
+    [`.${RDK_STR_RNR}title`]: {
+        display: 'inline-block',
+        margin: '5px 8px 0px 8px',
+        fontWeight: 'bold',
+        lineHeight: 1.3,
+    },
+    [`.${RDK_STR_RNR}checkbox`]: {
+        color: 'black',
+        display: 'block',
+        position: 'relative',
+        margin: '3px 0px 0px 8px',
+        padding: '0px 0px 0px 20px',
+        cursor: 'pointer',
+        fontWeight: 'normal',
+        lineHeight: 1.3,
+    },
+    [`.${RDK_STR_RNR}checkbox[disabled]`]: {
+        color: 'lightgray',
+    },
+    [`.${RDK_STR_RNR}checkbox input`]: {
+        margin: 0,
+        visibility: 'hidden',
+        cursor: 'pointer',
+    },
+    [`.${RDK_STR_RNR}checkbox .box`]: {
+        position: 'absolute',
+        top: '1px',
+        left: '0px',
+        height: '9px',
+        width: '9px',
+        backgroundColor: 'white',
+        border: '2px solid black',
+        boxSizing: 'content-box',
+    },
+    [`.${RDK_STR_RNR}checkbox[disabled] .box`]: {
+        border: '2px solid lightgray',
+    },
+    [`.${RDK_STR_RNR}checkbox:hover:not([disabled]) input ~ .box`]: {
+        backgroundColor: 'lightgray',
+    },
+    [`.${RDK_STR_RNR}checkbox:hover:not([disabled]) input:checked ~ .box`]: {
+        backgroundColor: 'blue',
+    },
+    [`.${RDK_STR_RNR}checkbox input:checked ~ .box`]: {
+        backgroundColor: 'blue',
+        border: 'solid blue',
+        borderWidth: '2px',
+        transitionDuration: '0.2s',
+    },
+    [`.${RDK_STR_RNR}checkbox input ~ .mark`]: {
+        display: 'none',
+    },
+    [`.${RDK_STR_RNR}checkbox input:checked ~ .mark`]: {
+        display: 'block',
+        position: 'absolute',
+        left: '4px',
+        top: '1px',
+        width: '3px',
+        height: '8px',
+        border: 'solid white',
+        padding: 0,
+        backgroundColor: 'transparent',
+        borderWidth: '0 2px 2px 0',
+        transform: 'rotate(45deg)',
+        boxSizing: 'content-box',
+    },
+    [`.${RDK_STR_RNR}formats`]: {
+        display: 'block',
+        position: 'relative',
+        margin: '3px 8px 3px 8px',
+        padding: 0,
+        cursor: 'default',
+        fontSize: '12px',
+    },
+    [`.${RDK_STR_RNR}formats .label`]: {
+        display: 'inline-block',
+        boxSizing: 'border-box',
+        cursor: 'pointer',
+        fontWeight: 'bold',
+        backgroundColor: 'white',
+        margin: 0,
+        lineHeight: 1.3,
+    },
+    [`.${RDK_STR_RNR}formats .chevron-label`]: {
+        padding: '3px 0px 0px 20px',
+    },
+    [`.${RDK_STR_RNR}formats input[type=checkbox]`]: {
+        visibility: 'hidden',
+        cursor: 'pointer',
+    },
+    [`.${RDK_STR_RNR}formats input ~ .chevron`]: {
+        position: 'absolute',
+        height: '6px',
+        width: '6px',
+        cursor: 'pointer',
+        backgroundColor: 'white',
+        border: 'solid black',
+        borderWidth: '0 2px 2px 0',
+        boxSizing: 'content-box',
+    },
+    [`.${RDK_STR_RNR}formats input ~ .chevron:hover`]: {
+        borderColor: 'darkgray',
+        transitionDuration: '0.2s',
+    },
+    [`.${RDK_STR_RNR}formats input ~ .collapsed`]: {
+        display: 'block',
+        top: '7px',
+        left: '2px',
+        transform: 'rotate(-45deg)',
+    },
+    [`.${RDK_STR_RNR}formats input:checked ~ .collapsed`]: {
+        display: 'none',
+    },
+    [`.${RDK_STR_RNR}formats input ~ .expanded`]: {
+        display: 'none',
+        top: '5px',
+        left: '2px',
+        transform: 'rotate(45deg)',
+    },
+    [`.${RDK_STR_RNR}formats input:checked ~ .expanded`]: {
+        display: 'block',
+    },
+    [`.${RDK_STR_RNR}formats input:checked ~ .spinner`]: {
+        display: 'block',
+        position: 'relative',
+        zIndex: 11,
+    },
+    [`.${RDK_STR_RNR}formats input ~ .spinner`]: {
+        display: 'none',
+    },
+    [`.${RDK_STR_RNR}formats input ~ .label`]: {
+        display: 'none',
+    },
+    [`.${RDK_STR_RNR}formats input ~ .table`]: {
+        display: 'none',
+    },
+    [`.${RDK_STR_RNR}formats input:checked ~ .label`]: {
+        display: 'inline-block',
+        margin: '8px 0 3px 0',
+    },
+    [`.${RDK_STR_RNR}formats input:checked ~ .table`]: {
+        display: 'table',
+        margin: '8px 0px 0px 0px',
+        borderCollapse: 'collapse',
+        width: '100%',
+        lineHeight: 1.3,
+    },
+    [`.${RDK_STR_RNR}formats .scale`]: {
+        display: 'inline-block',
+        borderWidth: '2px',
+        borderColor: 'black',
+        width: '3em',
+        visibility: 'visible',
+        cursor: 'auto',
+    },
+    [`.${RDK_STR_RNR}formats .fmtcell`]: {
+        border: 'none',
+        padding: '0 0.5em 0 0',
+        verticalAlign: 'middle',
+    },
+    [`.${RDK_STR_RNR}formats .scalecell`]: {
+        border: 'none',
+        padding: '0 0 4px 0',
+        textAlign: 'right',
+        verticalAlign: 'middle',
+    },
+    [`.${RDK_STR_RNR}formats .copy`]: {
+        display: 'inline-block',
+        border: 'none',
+        outline: 'none',
+        backgroundColor: 'transparent',
+        padding: '0px 4px 2px 4px',
+        cursor: 'pointer',
+    },
+    [`.${RDK_STR_RNR}formats .disabled-icon`]: {
+        color: '#D3D3D3',
+    },
+    [`.${RDK_STR_RNR}formats .disabled-label`]: {
+        color: 'lightgray',
+    },
+    [`.${RDK_STR_RNR}formats input ~ .box`]: {
+        display: 'none',
+    },
+    [`.${RDK_STR_RNR}formats input:checked ~ .box`]: {
+        display: 'block',
+        padding: '4px',
+        backgroundColor: 'white',
+        border: 'solid black',
+        borderWidth: '2px',
+        resize: 'vertical',
+        scrollbarWidth: 'thin',
+        cursor: 'auto',
+        fontFamily: 'monospace',
+        lineHeight: 'normal',
+    },
+    [`.${RDK_STR_RNR}formats input:checked ~ .box::-webkit-scrollbar`]: {
+        width: '0.8em',
+        height: '0.8em',
+        background: '#f1f1f1',
+    },
+    [`.${RDK_STR_RNR}formats input:checked ~ .box::-webkit-scrollbar-thumb`]: {
+        background: '#c1c1c1',
+    },
+    [`.${RDK_STR_RNR}formats input:checked ~ .smilesinchi`]: {
+        minHeight: '2em',
+        maxHeight: '4em',
+        height: '2em',
+        overflowY: 'scroll',
+    },
+    [`.${RDK_STR_RNR}formats input:checked ~ .molblock`]: {
+        minHeight: '6em',
+        maxHeight: '12em',
+        height: '6em',
+        overflow: 'scroll',
+    },
+};
 
 export default css;

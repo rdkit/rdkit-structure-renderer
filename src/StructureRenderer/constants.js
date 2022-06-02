@@ -34,11 +34,19 @@ const DEFAULT_DRAW_OPTS = {
     'backgroundColour': [1, 1, 1, 1]
 };
 
+const DEFAULT_IMG_OPTS = {
+    scaleFac: 1,
+    width: 300,
+    height: 200,
+};
+
 const RDK_STR_RNR = 'rdk-str-rnr-';
 
 const DIVID_SEPARATOR = '___';
 
 const DIV_ATTRS = [
+    'WIDTH',
+    'HEIGHT',
     'MOL',
     'SCAFFOLD',
     'DRAW_OPTS',
@@ -50,7 +58,15 @@ const DIV_ATTRS = [
     'USE_SVG'
 ];
 
-const BUTTON_TYPES = ['copy', 'cog'];
+const BUTTON_TYPES = [
+    {
+        type: 'copy',
+        tooltip: 'copy as PNG and molblock',
+    }, {
+        type: 'cog',
+        tooltip: 'settings',
+    }
+];
 
 const USER_OPTS = {
     RECOMPUTE2D: 'Re-compute 2D layout',
@@ -79,6 +95,7 @@ const WHL_OPTS = {
 
 export {
     DEFAULT_DRAW_OPTS,
+    DEFAULT_IMG_OPTS,
     RDK_STR_RNR,
     DIVID_SEPARATOR,
     DIV_ATTRS,

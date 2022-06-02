@@ -40,7 +40,7 @@
         "@pika/plugin-bundle-web": "^0.5.0",
         "@pika/plugin-copy-assets": "^0.5.0",
         "@pika/plugin-standard-pkg": "^0.5.0",
-        "@rdkit/rdkit": "^2022.3.2",
+        "@rdkit/rdkit": "^2022.3.3-2",
         "@webpack-cli/generators": "^2.4.2",
         "babel-loader": "^8.2.3",
         "eslint": "^8.10.0",

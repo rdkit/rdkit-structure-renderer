@@ -35,6 +35,7 @@ import defaultDialogHtml from './dialog.js';
 import defaultIcons from './icons.js';
 import Scheduler from './Scheduler.js';
 import SettingsDialog from './SettingsDialog.js';
+import ButtonTooltip from './ButtonTooltip.js';
 import {
     cssToText,
     decodeNewline,
@@ -1395,6 +1396,10 @@ const Renderer = {
      * Override to carry out specific actions before/after.
      */
     showSettings: function() {
+        const tooltip = this.getTooltip('cog');
+        if (tooltip && tooltip.isVisible()) {
+            tooltip.hide();
+        }
         this.settings.show();
     },
 
@@ -1428,14 +1433,13 @@ const Renderer = {
      * Creates a button Element of the desired type
      * if it does not yet exist and returns a copy.
      * @param {string} type either 'copy' or 'cog'
-     * @param {string} tooltip
      * @returns {Element} HTML button element
      */
-    createButton: function(type, tooltip) {
+    createButton: function(type) {
         this.buttons = this.buttons || {};
         if (!this.buttons[type]) {
             const div = document.createElement('div');
-            div.style.position = 'relative';
+            div.className = 'button-container';
             const button = document.createElement('button');
             button.className = `button ${type}`;
             button.name = `${type}-button`;
@@ -1443,16 +1447,6 @@ const Renderer = {
             const icon = this.getButtonIcon(type);
             button.appendChild(icon);
             div.appendChild(button);
-            if (tooltip) {
-                const innerDiv = document.createElement('div');
-                innerDiv.className = `tooltip ${type} hidden`;
-                const span = document.createElement('span');
-                span.className = `tooltiptext ${type} hidden`;
-                const tooltipText = document.createTextNode(tooltip);
-                span.appendChild(tooltipText);
-                innerDiv.appendChild(span);
-                div.appendChild(innerDiv);
-            }
             this.buttons[type] = div;
         }
         return this.buttons[type].cloneNode(true);
@@ -1768,6 +1762,39 @@ const Renderer = {
     },
 
     /**
+     * Called to get the tooltip of the requested type.
+     * If text is provided and the tooltip does not exist,
+     * it will be created.
+     * @param {string} type tooltip type ('copy' or 'cog')
+     * @param {string} text tooltip text
+     * @returns {object} ButtonTooltip instance
+     */
+    getTooltip: function(type, text) {
+        if (!this._tooltips) {
+            this._tooltips = {};
+        }
+        if (text && !this._tooltips[type]) {
+            this._tooltips[type] = new ButtonTooltip(this, text);
+        }
+        return this._tooltips[type];
+    },
+
+    /**
+     * Called to show/hide the button tooltip.
+     * @param {string} type tooltip type ('copy' or 'cog')
+     * @param {string} text tooltip text
+     * @param {object} e event
+     */
+    showHideTooltip: function(e, type, text) {
+        const tooltip = this.getTooltip(type, text);
+        if (e.type === 'mouseleave' && tooltip.isVisible()) {
+            tooltip.hide();
+        } else if (e.type === 'mouseenter' && e.target.firstChild && !tooltip.isVisible()) {
+            tooltip.show(e.target.firstChild);
+        }
+    },
+
+    /**
      * Update the div with a given divId.
      * An optional callback can be passed which will be called
      * whenever the user changes visualization options:
@@ -1800,31 +1827,29 @@ const Renderer = {
         this.currentDivs().set(divId, divAttrs);
         let molDraw = this.getMolDraw(div);
         this.getButtonTypes().forEach(({ type, tooltip }) => {
-            let buttonDiv = this.getButton(div, type);
+            let button = this.getButton(div, type);
             const shouldHide = this.toBool(divAttrs[`hide-${type}`]);
-            if (!shouldHide && !buttonDiv) {
-                buttonDiv = this.createButton(type, tooltip);
-                const button = buttonDiv.firstChild;
-                const tooltipText = buttonDiv.lastChild.firstChild;
-                if (tooltipText) {
+            if (!shouldHide && !button) {
+                button = this.createButton(type);
+                if (tooltip) {
                     button.onmouseenter = (e) => {
                         if (!(this.settings?.isVisible &&
                             divId === this.settings.currentDivId &&
-                            e?.target?.className.includes('cog'))) {
-                            tooltipText.className = `tooltiptext ${type} visible`;
+                            e?.target?.firstChild?.className.includes('cog'))) {
+                            this.showHideTooltip(e, type, tooltip);
                         }
                     }
-                    button.onmouseleave = () => {
-                        tooltipText.className = `tooltiptext ${type} hidden`;
+                    button.onmouseleave = (e) => {
+                        this.showHideTooltip(e, type, tooltip);
                     }
                 }
                 button.onclick = (e) => {
                     this.onButtonAction(e, type, div);
-                    button.onmouseleave && button.onmouseleave();
+                    button.onmouseleave && button.onmouseleave(e);
                 };
-                div.insertBefore(buttonDiv, molDraw);
-            } else if (shouldHide && buttonDiv) {
-                buttonDiv.remove();
+                div.insertBefore(button, molDraw);
+            } else if (shouldHide && button) {
+                button.remove();
             }
         });
         const useSvg = this.toBool(divAttrs[this.getDivAttrs().USE_SVG]);

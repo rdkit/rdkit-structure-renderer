@@ -31,6 +31,7 @@
 //
 
 import { RDK_STR_RNR } from './constants.js';
+import { getElementCenter, getViewPortRect } from './utils.js';
 
 /**
  * SettingsDialog class:
@@ -94,7 +95,7 @@ class SettingsDialog {
         // call it, otherwise copy text from the respective TextArea
         const onCopyFunc = this['onCopy' + field.toUpperCase()];
         if (onCopyFunc) {
-            await onCopyFunc.bind(this)();
+            await onCopyFunc.call(this);
         } else {
             const molText = this.textArea[field].value;
             const text = new Blob([molText], {type: 'text/plain'});
@@ -158,7 +159,7 @@ class SettingsDialog {
             }
             const divId = this.renderer.getDivId(this.molDiv);
             const currentDiv = this.renderer.currentDivs().get(divId);
-            if (!currentDiv?.childQueue) {
+            if (this.currentDivId !== divId || !currentDiv?.childQueue) {
                 this.textArea.molblock.style.opacity = '1';
                 this.molblockSpinner.div.style.display = displaySpinner;
                 this.molblockSpinner.innerDiv.style.display = displaySpinner;
@@ -393,29 +394,15 @@ class SettingsDialog {
     }
 
     /**
-     * Get viewport width or height.
-     * @param {string} attr either 'Width' or 'Height'
+     * Override to ignore certain HTML elements
+     * standing where the cog ought to be.
+     * @param {HTMLElement} elem
+     * @returns {boolean} whether the passed element
+     * should be ignored or not
      */
-    _getViewPortSizeAttr(attr) {
-        const innerAttr = `inner${attr}`;
-        const clientAttr = `client${attr}`;
-        const innerSize = window[innerAttr];
-        const clientSize = document.documentElement[clientAttr];
-        return innerSize && clientSize ? Math.min(innerSize, clientSize) :
-            innerSize || clientSize || document.body[clientAttr];
-    }
-
-    /**
-     * Get viewport dimensions.
-     * @returns {object} viewport dimensions
-     */
-    getViewPortRect() {
-        return {
-            left: 0,
-            top: 0,
-            width: this._getViewPortSizeAttr('Width'),
-            height: this._getViewPortSizeAttr('Height'),
-        }
+    // eslint-disable-next-line no-unused-vars
+    shouldIgnoreElement(elem) {
+        return false;
     }
 
     /**
@@ -423,17 +410,19 @@ class SettingsDialog {
      * @param {object} e event, when called by an Event handler, or null
      */
     setPosition(e) {
-        // ignore scroling events from our textareas
-        // and do nothing if we are not visible
-        if (e?.type === 'scroll' && (!this.isVisible ||
-            (e.target && Object.values(this.textArea).includes(e.target)))) {
-            return;
+        if (e) {
+            // ignore non-scrolling events
+            if (e.type !== 'scroll') {
+                return;
+            }
+            // ignore scrolling events from our textareas
+            // and do nothing if we are not visible
+            if (!this.isVisible ||
+                (e.target && Object.values(this.textArea).includes(e.target))) {
+                return;
+            }
         }
-        const cogRect = this.buttons.cog.getBoundingClientRect();
-        const cogCenter = {
-            x: Math.round(cogRect.left + 0.5 * cogRect.width),
-            y: Math.round(cogRect.top + 0.5 * cogRect.height),
-        };
+        const cogCenter = getElementCenter(this.buttons.cog);
         const dialogRect = this.dialog.getBoundingClientRect();
         if (!this._initialDialogRect) {
             this._initialDialogRect = {
@@ -449,7 +438,7 @@ class SettingsDialog {
         if (!this.dialogRelatives.parentNode) {
             let elemAtCogCenter;
             this.buttons.cog.style.display = 'block';
-            // temporarily hide the dialog to probe which which HTML Element
+            // temporarily hide the dialog to probe which HTML Element
             // we have in correspondence of the cog center
             this.dialog.style.display = 'none';
             try {
@@ -462,7 +451,10 @@ class SettingsDialog {
             // if it is, then the cog button is still visible, otherwise
             // it has gone out of screen and we should hence hide the dialog
             let cogVisible = !!elemAtCogCenter;
-            if (cogVisible && elemAtCogCenter.nodeName !== 'HTML') {
+            if (cogVisible) {
+                if (this.shouldIgnoreElement(elemAtCogCenter)) {
+                    return;
+                }
                 cogVisible = false;
                 while (elemAtCogCenter) {
                     if (elemAtCogCenter === this.buttons.cog) {
@@ -501,7 +493,7 @@ class SettingsDialog {
         // if this is not a scrolling event, or it is and the dialog
         // has not scrolled as much as the cog button has, compute
         // the dialog position and set it
-        const viewPortRect = this.getViewPortRect();
+        const viewPortRect = getViewPortRect();
         const beforeNodeRect = this.dialogRelatives.beforeNode?.getBoundingClientRect() || viewPortRect;
         const topLeft = {
             x: cogCenter.x - this._initialDialogRect.x,

@@ -369,6 +369,44 @@ const getDepiction = function({
     return res;
 };
 
+/**
+ * Get the center of an HTML element.
+ * @param {HTMLElement} element
+ * @returns {object} dictionary with the { x, y } center
+ */
+const getElementCenter = (element) => {
+    const elementRect = element.getBoundingClientRect();
+    return {
+        x: Math.round(elementRect.left + 0.5 * elementRect.width),
+        y: Math.round(elementRect.top + 0.5 * elementRect.height),
+    };
+}
+
+/**
+ * Get viewport width or height.
+ * @param {string} attr either 'Width' or 'Height'
+ * @returns {number} the viewport width or height
+ */
+const _getViewPortSizeAttr = (attr) => {
+    const innerAttr = `inner${attr}`;
+    const clientAttr = `client${attr}`;
+    const innerSize = window[innerAttr];
+    const clientSize = document.documentElement[clientAttr];
+    return innerSize && clientSize ? Math.min(innerSize, clientSize) :
+        innerSize || clientSize || document.body[clientAttr];
+};
+
+/**
+ * Get viewport dimensions.
+ * @returns {object} viewport dimensions
+ */
+const getViewPortRect = () => ({
+    left: 0,
+    top: 0,
+    width: _getViewPortSizeAttr('Width'),
+    height: _getViewPortSizeAttr('Height'),
+});
+
 export {
     decodeNewline,
     encodeNewline,
@@ -385,4 +423,6 @@ export {
     setNewCoords,
     getDepiction,
     cssToText,
+    getElementCenter,
+    getViewPortRect,
 };

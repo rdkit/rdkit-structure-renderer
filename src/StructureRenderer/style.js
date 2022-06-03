@@ -76,6 +76,11 @@ const css = {
     [`.${RDK_STR_RNR}mol-draw`]: {
         position: 'absolute',
     },
+    [`.${RDK_STR_RNR}mol-container .button-container`]: {
+        position: 'absolute',
+        width: '100%',
+        height: 0,
+    },
     [`.${RDK_STR_RNR}mol-container .button`]: {
         position: 'absolute',
         top: '1px',
@@ -90,33 +95,30 @@ const css = {
         lineHeight: 1,
         transitionDuration: '0.2s',
     },
-    [`.${RDK_STR_RNR}mol-container .tooltip`]: {
+    [`.${RDK_STR_RNR}tooltip`]: {
         position: 'absolute',
-        display: 'inline-block',
-        whiteSpace: 'nowrap',
-        opacity: 1,
-        visibility: 'hidden',
+        padding: 0,
+        margin: 0,
         zIndex: 2001,
     },
-    [`.${RDK_STR_RNR}mol-container .tooltip .tooltiptext`]: {
+    [`.${RDK_STR_RNR}tooltip .container`]: {
+        display: 'inline-block',
+    },
+    [`.${RDK_STR_RNR}tooltip .text`]: {
         backgroundColor: 'grey',
         color: 'white',
         textAlign: 'center',
-        padding: '5px 5px',
-        borderRadius: '6px',
-        position: 'absolute',
+        padding: '3px 5px 4px 5px',
+        borderRadius: '5px',
+        fontFamily: 'Arial, Helvetica, sans-serif',
+        whiteSpace: 'nowrap',
+        fontWeight: 'normal',
         fontSize: '11px',
     },
-    [`.${RDK_STR_RNR}mol-container .tooltip .copy`]: {
-        transform: 'translateX(calc(-50% + 5px)) translateY(-110%)',
-    },
-    [`.${RDK_STR_RNR}mol-container .tooltip .cog`]: {
-        transform: 'translateX(calc(50% - 5px)) translateY(-110%)',
-    },
-    [`.${RDK_STR_RNR}mol-container .tooltip .visible`]: {
+    [`.${RDK_STR_RNR}tooltip .visible`]: {
         visibility: 'visible',
     },
-    [`.${RDK_STR_RNR}mol-container .tooltip .hidden`]: {
+    [`.${RDK_STR_RNR}tooltip .hidden`]: {
         visibility: 'hidden',
     },
     [`.${RDK_STR_RNR}mol-container .cog`]: {

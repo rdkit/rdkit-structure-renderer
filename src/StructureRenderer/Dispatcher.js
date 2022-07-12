@@ -89,10 +89,12 @@ main(rdkitReady, ${this.id});`
         if (!window.Worker) {
             throw Error("Workers are not supported");
         }
-        const blob = new Blob(this.getWorkerBlob(minimalLibPath));
-        const url = window.URL || window.webkitURL;
-        const blobUrl = url.createObjectURL(blob);
-        return new Worker(blobUrl);
+        return new Promise(resolve => {
+            const blob = new Blob(this.getWorkerBlob(minimalLibPath));
+            const url = window.URL || window.webkitURL;
+            const blobUrl = url.createObjectURL(blob);
+            resolve(new Worker(blobUrl));
+        });
     }
 
     /**
@@ -160,7 +162,7 @@ main(rdkitReady, ${this.id});`
                 const msgChannel = new MessageChannel();
                 const pingMsg = { wPort: msgChannel.port2 };
                 msgChannel.port1.onmessage = () => _parseMsg(_sendMsg.resolve);
-                this._worker.postMessage(pingMsg, [msgChannel.port2]);
+                (async () => (await this._worker).postMessage(pingMsg, [msgChannel.port2]))();
                 return msgChannel.port1;
             };
             this._ready = await new Promise(resolve => {
@@ -169,7 +171,7 @@ main(rdkitReady, ${this.id});`
                 tid = setInterval(_parseMsg, TIMEOUT);
             });
         }
-        this._worker.postMessage(...args);
+        (await this._worker).postMessage(...args);
     }
 }
 

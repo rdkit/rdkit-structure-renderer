@@ -377,6 +377,9 @@ const Renderer = {
             }
             this._minimalLibPath = minimalLibPath.substring(0, minimalLibPath.lastIndexOf('/'));
             this._minimalLibJs = `${this._minimalLibPath}/RDKit_minimal.js`;
+            // create the Scheduler (which in turn may spawn WebWorkers)
+            // if it has not been created yet
+            this.scheduler();
         }
         // if the RDKit module has already been initialzed, return it
         const _loadRDKitModule = (resolve) => {
@@ -400,8 +403,6 @@ const Renderer = {
                         throw Error('_loadRDKitModule: initRDKitModule is not a function');
                     }
                     _RDKitModule = window.initRDKitModule();
-                    // create the Scheduler (which in turn may spawn WebWorkers)
-                    (async () => this.scheduler())();
                     res = (async () => {
                         _RDKitModule = await _RDKitModule;
                         if (!this.isRDKitReady()) {

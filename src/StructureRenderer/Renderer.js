@@ -696,9 +696,15 @@ const Renderer = {
      */
     decRef: function(key) {
         const cachedEntry = this.userOptCache[key];
-        if (cachedEntry && !--cachedEntry.refCount) {
-            delete cachedEntry.currentMol;
+        if (cachedEntry) {
+            if (cachedEntry.refCount) {
+                --cachedEntry.refCount;
+            }
+            if (!cachedEntry.refCount) {
+                delete cachedEntry.currentMol;
+            }
         }
+        this.updateUserOptCache(key);
     },
 
     /**
@@ -974,7 +980,7 @@ const Renderer = {
             if (pickle) {
                 this.setCurrentMol(key, pickle, match);
                 if (userOpts.SCAFFOLD_ALIGN || userOpts.SCAFFOLD_HIGHLIGHT) {
-                    if (!match) {
+                    if (!match && scaffoldText) {
                         this.setFailsMatch(key, scaffoldText);
                     } else {
                         this.clearFailsMatch(key);
@@ -1759,7 +1765,6 @@ const Renderer = {
         this.currentDivs().delete(divId);
         const key = this.getCacheKey(divId);
         this.decRef(key);
-        this.updateUserOptCache(key);
     },
 
     /**
@@ -1875,14 +1880,15 @@ const Renderer = {
      * and will do so if needed.
      * @param {string} divId
      * @param {function} userOptsCallback optional callback
+     * @returns {boolean} whether the div was updated
      */
     updateMolDrawDivIfNeeded: function(divId, userOptsCallback) {
+        let shouldDraw = false;
         const div = this.getMolDiv(divId);
         if (!div) {
-            return;
+            return shouldDraw;
         }
         let currentDivValue;
-        let shouldDraw = false;
         if (!shouldDraw) {
             // if this divId has not been seen before, it needs to
             // be drawn
@@ -1918,6 +1924,7 @@ const Renderer = {
         if (shouldDraw) {
             this.updateMolDrawDiv(divId, userOptsCallback);
         }
+        return shouldDraw;
     },
 
     /**

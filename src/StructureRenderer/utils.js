@@ -113,18 +113,58 @@ const getMolblockFromMol = mol => {
 };
 
 /**
- * Generate molecule from either SMILES or CTAB.
- * @param {string} molText either SMILES or CTAB
+ * Generate molecule from UInt8Array.
+ * @param {UInt8Array} molPickle pickled molecule as UInt8Array
  * @returns {JSMol} molecule or null in case of failure
  */
-const getMolSafe = (rdkitModule, molText) => {
+ const getMolFromUInt8Array = (rdkitModule, pickle) => {
+    let mol;
+    try {
+        mol = rdkitModule.get_mol_from_uint8array(pickle);
+    } catch(e) {
+        console.error(`Failed to generate mol from pickle (${e})`);
+    }
+    if (mol && !mol.is_valid()) {
+        console.error(`Failed to generate valid mol from pickle`);
+        mol.delete();
+        mol = null;
+    }
+    return mol;
+}
+
+/**
+ * Return True if the passed string is a pkl_base64
+ * @param {string} molText SMILES, CTAB or pkl_base64
+ * @returns {boolean} True if pkl_base64
+ */
+const isBase64Pickle = (molText) => molText.startsWith('pkl_');
+
+/**
+ * Extract pickle from a pkl_base64 string
+ * @param {string} molText pkl_base64 string
+ * @returns {Uint8Array} Uint8Array pickle
+ */
+const extractBase64Pickle = (molText) => Uint8Array.from(
+    atob(molText.substring(4)), c => c.charCodeAt(0)
+);
+
+/**
+ * Generate molecule from SMILES, CTAB or pkl_base64.
+ * @param {string} molText SMILES, CTAB or pkl_base64
+ * @returns {JSMol} molecule or null in case of failure
+ */
+const getMolSafe = (rdkitModule, molText, get_mol_opts) => {
+    if (isBase64Pickle(molText)) {
+        const molPickle = extractBase64Pickle(molText);
+        return getMolFromUInt8Array(rdkitModule, molPickle);
+    }
     const FALLBACK_OPS = ['kekulize', 'sanitize'];
     // this is called recursively until success
     // or until FALLBACK_OPS are available
     const _getMolSafe = opIdx => {
         let exc = '';
         let mol = null;
-        let opts = {};
+        let opts = get_mol_opts || {};
         let op;
         if (typeof opIdx === 'number') {
             op = FALLBACK_OPS[opIdx];
@@ -264,15 +304,7 @@ const getDepiction = function({
         if (molText) {
             mol = getMolSafe(rdkitModule, molText);
         } else if (molPickle) {
-            try {
-                mol = rdkitModule.get_mol_from_uint8array(molPickle);
-                if (mol && !mol.is_valid()) {
-                    mol.delete();
-                    mol = null;
-                }
-            } catch(e) {
-                console.error(`Failed to generate mol from pickle (${e})`);
-            }
+            mol = getMolFromUInt8Array(rdkitModule, molPickle);
         }
     }
     if (mol) {
@@ -280,17 +312,19 @@ const getDepiction = function({
             const abbreviate = opts.ABBREVIATE;
             const normalize = !opts.NO_MOL_NORMALIZE;
             let straighten = !opts.NO_MOL_STRAIGHTEN;
+            let canonicalize = straighten ? 1 : 0;
             const normalizeScaffold = !opts.NO_SCAFFOLD_NORMALIZE;
             const straightenScaffold = !opts.NO_SCAFFOLD_STRAIGHTEN;
+            const canonicalizeScaffold = straightenScaffold ? 1 : 0;
             switch (type) {
                 case 'c': {
                     useCoordGen = true;
-                    pickle = getNormPickle(mol, { useCoordGen, normalize, straighten });
+                    pickle = getNormPickle(mol, { useCoordGen, normalize, canonicalize, straighten });
                     break;
                 }
                 case 'a': {
                     match = {};
-                    let scaffold = getMolSafe(rdkitModule, scaffoldText);
+                    let scaffold = getMolSafe(rdkitModule, scaffoldText, { mergeQueryHs: true });
                     if (!scaffold) {
                         console.error(`Failed to generate RDKit scaffold`);
                     } else if (!scaffold.has_coords()) {
@@ -307,7 +341,7 @@ const getDepiction = function({
                     if (scaffold) {
                         if (scaffold.is_valid()) {
                             if (normalizeScaffold) {
-                                scaffold.normalize_depiction();
+                                scaffold.normalize_depiction(canonicalizeScaffold);
                             }
                             if (straightenScaffold) {
                                 scaffold.straighten_depiction();
@@ -336,7 +370,6 @@ const getDepiction = function({
                         }
                         scaffold.delete();
                     }
-                    let canonicalize = 1;
                     if (match) {
                         straighten = false;
                         canonicalize = 0;
@@ -345,7 +378,7 @@ const getDepiction = function({
                     break;
                 }
                 case 'r': {
-                    pickle = getNormPickle(mol, { useCoordGen, normalize, straighten });
+                    pickle = getNormPickle(mol, { useCoordGen, normalize, canonicalize, straighten });
                     break;
                 }
                 case 's': {
@@ -418,6 +451,9 @@ export {
     tagToKey,
     getMolblockFromMol,
     getMolSafe,
+    isBase64Pickle,
+    extractBase64Pickle,
+    getMolFromUInt8Array,
     getPickleSafe,
     getNormPickle,
     setNewCoords,

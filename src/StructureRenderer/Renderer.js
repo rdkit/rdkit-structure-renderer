@@ -42,6 +42,7 @@ import {
     dataAttr,
     dashToCamelCase,
     getMolblockFromMol,
+    getMolFromUInt8Array,
     keyToTag,
 } from './utils.js';
 import {
@@ -618,8 +619,8 @@ const Renderer = {
     /**
      * Request mol pickle for a given divId.
      * @param {string} divId id of the div le molecule belongs to
-     * @param {string} molText molecule description (SMILES or molblock)
-     * @param {string} scaffoldText scaffold description (SMILES or molblock)
+     * @param {string} molText molecule description (SMILES, molblock or pkl_base64)
+     * @param {string} scaffoldText scaffold description (SMILES, molblock or pkl_base64)
      * @param {object} opts rendering options
      * @returns {Promise} a Promise that will resolve to an object
      * containing the mol pickle when the job is completed, or to null
@@ -628,7 +629,7 @@ const Renderer = {
     requestMolPickle: function(divId, molText, scaffoldText, opts) {
         if (!molText) {
             return Promise.resolve({
-                pickle: new Uint8Array(),
+                pickle: null,
                 match: null,
                 svg: null,
             });
@@ -670,7 +671,7 @@ const Renderer = {
     /**
      * Request molecule description for a given div.
      * @param {Element} div
-     * @returns {string} molecule description (SMILES or molblock)
+     * @returns {string} molecule description (SMILES, molblock, pkl_base64)
      */
     getMol: function(div) {
         const attr = dataAttr(this.getDivAttrs().MOL);
@@ -746,7 +747,8 @@ const Renderer = {
     /**
      * Get scaffold description for a given div.
      * @param {Element} div
-     * @returns {string} scaffold description (SMILES or molblock)
+     * @returns {string} scaffold description
+     * (SMILES, molblock or pkl_base64)
      */
     getScaffold: function(div) {
         const attr = dataAttr(this.getDivAttrs().SCAFFOLD);
@@ -955,7 +957,7 @@ const Renderer = {
     draw: async function(div, returnMolBlock) {
         // if the div has 0 size, do nothing, as it may have
         // already been unmounted
-        const { width, height } = this.getDivRoundedSize(div);
+        const { width, height } = this.getRoundedDivSize(div);
         // get a spinner wheel with a radius appropriate
         // to the size of div
         const spinner = this.getSpinner(div);
@@ -988,7 +990,7 @@ const Renderer = {
                 }
                 if (userOpts.SCAFFOLD_HIGHLIGHT && match) {
                     Object.assign(drawOpts, match);
-                } else {
+                } else if (!userOpts.SCAFFOLD_HIGHLIGHT) {
                     delete drawOpts.atoms;
                     delete drawOpts.bonds;
                 }
@@ -1117,18 +1119,7 @@ const Renderer = {
     getMolFromPickle: async function(pickle) {
         // block until rdkitModule is ready
         const rdkitModule = await this.getRDKitModule();
-        let mol;
-        try {
-            mol = rdkitModule.get_mol_from_uint8array(pickle);
-        } catch(e) {
-            console.error(`Failed to generate mol from pickle (${e})`);
-        }
-        if (mol && !mol.is_valid()) {
-            console.error(`Failed to generate valid mol from pickle`);
-            mol.delete();
-            mol = null;
-        }
-        return mol;
+        return getMolFromUInt8Array(rdkitModule, pickle);
     },
 
     /**
@@ -1339,7 +1330,7 @@ const Renderer = {
                     content[type] = new Blob([molblock], { type });
                 }
                 if (hasPng || hasSvg) {
-                    const { width, height } = this.getDivRoundedSize(div);
+                    const { width, height } = this.getRoundedDivSize(div);
                     const opts = {
                         width,
                         height,
@@ -1518,21 +1509,17 @@ const Renderer = {
     },
 
     /**
-     * Returns a dictionary with current width and height
+     * Returns a dictionary with width and height
      * associated to the passed div as rounded integers.
-     * If either dimensions is zero, the width and height set at
-     * instantiation time will be returned.
+     * If the data-width and data-height attributes are not present or 0,
+     * the current div rect width and height are returned.
      * @param {Element} div
      * @returns {object} { width: integer, height: integer } dictionary
      */
-    getDivRoundedSize: function(div) {
+    getRoundedDivSize: function(div) {
         const divRect = div.getBoundingClientRect();
-        let width = Math.round(divRect.width);
-        let height = Math.round(divRect.height);
-        if (!(width > 0 && height > 0)) {
-            width = parseInt(div.getAttribute(dataAttr(this.getDivAttrs().WIDTH)) || '0');
-            height = parseInt(div.getAttribute(dataAttr(this.getDivAttrs().HEIGHT)) || '0');
-        }
+        const width = parseInt(div.getAttribute(dataAttr(this.getDivAttrs().WIDTH)) || '0') || Math.round(divRect.width);
+        const height = parseInt(div.getAttribute(dataAttr(this.getDivAttrs().HEIGHT)) || '0') || Math.round(divRect.height);
         return { width, height };
     },
 
@@ -1568,7 +1555,7 @@ const Renderer = {
             this._svgDiv = svgDiv;
         }
         const svgDiv = this._svgDiv.cloneNode(true);
-        const { width, height } = this.getDivRoundedSize(div);
+        const { width, height } = this.getRoundedDivSize(div);
         this.resizeMolDraw(svgDiv, width, height);
         return svgDiv;
     },
@@ -1586,7 +1573,7 @@ const Renderer = {
             this._canvas = canvas;
         }
         const canvas = this._canvas.cloneNode(true);
-        const { width, height } = this.getDivRoundedSize(div);
+        const { width, height } = this.getRoundedDivSize(div);
         this.resizeMolDraw(canvas, width, height);
         return canvas;
     },
@@ -1824,14 +1811,17 @@ const Renderer = {
         this.clearCurrentMol(key);
         const divAttrs = Object.fromEntries(this.allTags().map(tag =>
             [tag, div.getAttribute(dataAttr(tag))]));
-        const { width, height } = this.getDivRoundedSize(div);
+        let molDraw = this.getMolDraw(div);
+        const { width, height } = this.getRoundedDivSize(div);
         if (width > 0 && height > 0) {
             divAttrs[this.getDivAttrs().WIDTH] = width;
             divAttrs[this.getDivAttrs().HEIGHT] = height;
+            if (molDraw) {
+                this.resizeMolDraw(molDraw, width, height);
+            }
         }
         divAttrs.userOptsCallback = userOptsCallback;
         this.currentDivs().set(divId, divAttrs);
-        let molDraw = this.getMolDraw(div);
         this.getButtonTypes().forEach(({ type, tooltip }) => {
             let button = this.getButton(div, type);
             const shouldHide = this.toBool(divAttrs[`hide-${type}`]);
@@ -1903,7 +1893,7 @@ const Renderer = {
         // if some attribute changed
         const allTags = [...this.allTags()];
         if (!shouldDraw) {
-            const { width, height } = this.getDivRoundedSize(div);
+            const { width, height } = this.getRoundedDivSize(div);
             if (!(width > 0 && height > 0)) {
                 delete allTags[this.getDivAttrs().WIDTH];
                 delete allTags[this.getDivAttrs().HEIGHT];

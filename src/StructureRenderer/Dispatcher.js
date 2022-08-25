@@ -32,7 +32,10 @@
 
 import {
     getMolSafe,
+    getMolFromUInt8Array,
     getNormPickle,
+    isBase64Pickle,
+    extractBase64Pickle,
     getPickleSafe,
     setNewCoords,
     getDepiction
@@ -58,11 +61,15 @@ class Dispatcher {
 const rdkitReady = initRDKitModule({
     locateFile: (path) => '${minimalLibPath}/' + path,
 });
+const ${isBase64Pickle.name} = ${isBase64Pickle};
+const ${extractBase64Pickle.name} = ${extractBase64Pickle};
+const ${getMolFromUInt8Array.name} = ${getMolFromUInt8Array};
 const ${getPickleSafe.name} = ${getPickleSafe};
 const ${getMolSafe.name} = ${getMolSafe};
 const ${getNormPickle.name} = ${getNormPickle};
 const ${setNewCoords.name} = ${setNewCoords};
 const getDepiction = ${getDepiction};
+
 const main = (rdkitReady, dispatcherId) => {
     onmessage = ({ data }) => rdkitReady.then(rdkitModule => {
         const { wPort } = data;

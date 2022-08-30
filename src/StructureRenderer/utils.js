@@ -313,6 +313,7 @@ const getDepiction = function({
             const normalize = !opts.NO_MOL_NORMALIZE;
             let straighten = !opts.NO_MOL_STRAIGHTEN;
             let canonicalize = straighten ? 1 : 0;
+            const allowAlignOnly = !opts.NO_ALIGN_ONLY;
             const normalizeScaffold = !opts.NO_SCAFFOLD_NORMALIZE;
             const straightenScaffold = !opts.NO_SCAFFOLD_STRAIGHTEN;
             const canonicalizeScaffold = straightenScaffold ? 1 : 0;
@@ -347,8 +348,14 @@ const getDepiction = function({
                                 scaffold.straighten_depiction();
                             }
                             try {
-                                match = JSON.parse(mol.generate_aligned_coords(scaffold, true, true, false));
-                            } catch {
+                                match = JSON.parse(mol.generate_aligned_coords(scaffold, JSON.stringify({
+                                    useCoordGen: true,
+                                    allowRGroups: true,
+                                    acceptFailure: false,
+                                    alignOnly: allowAlignOnly && mol.has_coords(),
+                                })) || null);
+                            } catch(e) {
+                                console.error(`Exception in generate_aligned_coords (${e})`);
                                 match = null;
                             }
                             if (match && abbreviate) {

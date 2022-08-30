@@ -489,6 +489,16 @@ const Renderer = {
     },
 
     /**
+     * Return divs corresponding to key.
+     * @param {string} key cache key
+     * @returns {Array<Element>} array of currently mounted mol divs
+     * corresponding to key
+     */
+    getMolDivsForKey: function(key) {
+        return document.querySelectorAll(`div[id$=${this.getDivIdSeparator()}${key}`);
+    },
+
+    /**
      * Return array of currently mounted mol divs.
      * @returns {Array<Element>} array of currently mounted mol divs
      */

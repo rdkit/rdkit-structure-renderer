@@ -77,7 +77,8 @@ const USER_OPTS = {
     NO_MOL_NORMALIZE: null,
     NO_MOL_STRAIGHTEN: null,
     NO_SCAFFOLD_NORMALIZE: null,
-    NO_SCAFFOLD_STRAIGHTEN: null
+    NO_SCAFFOLD_STRAIGHTEN: null,
+    NO_ALIGN_ONLY: null,
 };
 
 const NO_MATCH = '_noMatch';

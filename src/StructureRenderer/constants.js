@@ -76,8 +76,10 @@ const USER_OPTS = {
     ATOM_IDX: 'Add atom indices',
     NO_MOL_NORMALIZE: null,
     NO_MOL_STRAIGHTEN: null,
+    NO_MOL_CANONICALIZE: null,
     NO_SCAFFOLD_NORMALIZE: null,
     NO_SCAFFOLD_STRAIGHTEN: null,
+    NO_SCAFFOLD_CANONICALIZE: null,
     NO_ALIGN_ONLY: null,
 };
 

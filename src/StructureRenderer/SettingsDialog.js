@@ -194,8 +194,6 @@ class SettingsDialog {
                 this.renderOpt[recompute2DTag].checked = false;
                 this.renderer.updateUserOptCache(key, recompute2DTag, null);
             }
-            const recompute2DAction = isChecked ? this.disableAction : this.enableAction;
-            recompute2DAction(this.renderOpt[recompute2DTag]);
         }
         if (isScaffoldAlign || field === recompute2DTag) {
             func = this.enableCopyMolblock.bind(this);
@@ -316,15 +314,17 @@ class SettingsDialog {
      * @param {Element} div
      */
     enableScaffoldOpts(div) {
-        const scaffold = this.renderer.getScaffold(div);
-        const key = this.renderer.getCacheKey(div);
-        const hasScaffold = scaffold && !this.renderer.getFailsMatch(key, scaffold);
         const userOpts = this.renderer.getAvailUserOpts();
         const drawOpts = this.renderer.getDrawOpts(div);
-        // enable scaffold alignment only if a scaffold
-        // definition is available
-        // enable scaffold highlighting only if a scaffold
-        // definition is available, or if drawOpts has a non-empty
+        const scaffold = this.renderer.getScaffold(div);
+        const key = this.renderer.getCacheKey(div);
+        const hasScaffold = !!scaffold;
+        const failsMatch = hasScaffold && this.renderer.getFailsMatch(key, scaffold);
+        const canAlign = hasScaffold && !failsMatch;
+        // enable scaffold alignment only if a scaffold definition is available
+        // and if that has not failed to match before
+        // enable scaffold highlighting only if a scaffold definition is available
+        // and if that has not failed to match before, or if drawOpts has a non-empty
         // "atoms" attribute
         const disableAndUncheck = (tag) => {
             const control = this.renderOpt[tag];
@@ -339,18 +339,13 @@ class SettingsDialog {
             }
             this.enableAction(control);
         };
-        const alignAction = hasScaffold ? enableAndMaybeCheck : disableAndUncheck;
-        const highlightAction = hasScaffold
+        const alignAction = canAlign ? enableAndMaybeCheck : disableAndUncheck;
+        const highlightAction = canAlign
             || (drawOpts.atoms && Array.isArray(drawOpts.atoms) && drawOpts.atoms.length)
             || (drawOpts.bonds && Array.isArray(drawOpts.bonds) && drawOpts.bonds.length)
             ? enableAndMaybeCheck : disableAndUncheck;
         alignAction(userOpts.SCAFFOLD_ALIGN.tag);
         highlightAction(userOpts.SCAFFOLD_HIGHLIGHT.tag);
-        const shouldAlign = hasScaffold && (this.renderer.getBoolOpt(
-            div, userOpts.SCAFFOLD_ALIGN.tag) || false);
-        // enable recompute2D only if alignment to scaffold is unchecked
-        const recompute2DAction = shouldAlign ? this.disableAction : this.enableAction;
-        recompute2DAction(this.renderOpt[userOpts.RECOMPUTE2D.tag]);
     }
 
     /**

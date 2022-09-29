@@ -45,10 +45,17 @@ const decodeNewline = s => s.replace(/&#10;/g, '\n');
 const encodeNewline = s => s.replace(/\n/g, '&#10;');
 
 /**
+ * Return True if the passed string is a pkl_base64
+ * @param {string} molText SMILES, CTAB or pkl_base64
+ * @returns {boolean} True if pkl_base64
+ */
+ const isBase64Pickle = (molText) => molText.startsWith('pkl_');
+
+/**
  * Return true if molblock is an MDL molblock.
  * @returns {string} true if MDL molblock
  */
-const isMolBlock = molText => molText.includes('M  END');
+const isMolBlock = molText => !isBase64Pickle(molText) && molText.includes('M  END');
 
 /**
  * Return 'data-' prefixed attr.
@@ -133,13 +140,6 @@ const getMolblockFromMol = mol => {
 }
 
 /**
- * Return True if the passed string is a pkl_base64
- * @param {string} molText SMILES, CTAB or pkl_base64
- * @returns {boolean} True if pkl_base64
- */
-const isBase64Pickle = (molText) => molText.startsWith('pkl_');
-
-/**
  * Extract pickle from a pkl_base64 string
  * @param {string} molText pkl_base64 string
  * @returns {Uint8Array} Uint8Array pickle
@@ -196,10 +196,10 @@ const getMolSafe = (rdkitModule, molText, get_mol_opts) => {
 };
 
 /**
-    * Returns the passed molecule as Uint8Array pickle.
-    * @param {JSMol} mol input molecule
-    * @returns pickled molecule as Uint8Array
-    */
+ * Returns the passed molecule as Uint8Array pickle.
+ * @param {JSMol} mol input molecule
+ * @returns pickled molecule as Uint8Array
+ */
 const getPickleSafe = (mol) => {
     let pickle;
     try {
@@ -212,26 +212,28 @@ const getPickleSafe = (mol) => {
 };
 
 /**
-    * Returns the passed molecule as Uint8Array pickle
-    * after:
-    * - generating coordinates if it has none
-    * - normalizing coordinates if normalize is true
-    * - straightening the depiction if straighten is true
-    * @param {JSMol} mol input molecule
-    * @param {boolean} useCoordGen whether CoordGen should be used
-    * to generate 2D coordinates if the molecules has none
-    * @param {boolean} normalize whether coordinates should be normalized
-    * @param {number} canonicalize 0: do not canonicalize, 1: X axis, -1: Y axis
-    * @param {boolean} straighten whether depiction should be straightened
-    * @returns pickled molecule as Uint8Array
-    */
+ * Returns the passed molecule as Uint8Array pickle
+ * after:
+ * - generating coordinates if it has none
+ * - normalizing coordinates if normalize is true
+ * - straightening the depiction if straighten is true
+ * @param {JSMol} mol input molecule
+ * @param {boolean} useCoordGen whether CoordGen should be used
+ * to generate 2D coordinates if the molecules has none
+ * @param {boolean} normalize whether coordinates should be normalized
+ * @param {number} canonicalize 0: do not canonicalize, 1: X axis, -1: Y axis
+ * @param {boolean} straighten whether depiction should be straightened
+ * @returns pickled molecule as Uint8Array
+ */
 const getNormPickle = (mol, { useCoordGen, normalize, canonicalize, straighten }) => {
     let pickle = '';
     if (typeof canonicalize === 'undefined') {
         canonicalize = 1;
     }
     let hasCoords = mol.has_coords();
+    let minimizeRotation = !canonicalize;
     if (!hasCoords || useCoordGen) {
+        minimizeRotation = false;
         hasCoords = setNewCoords(mol, useCoordGen);
     }
     if (hasCoords) {
@@ -239,7 +241,7 @@ const getNormPickle = (mol, { useCoordGen, normalize, canonicalize, straighten }
             mol.normalize_depiction(canonicalize);
         }
         if (straighten) {
-            mol.straighten_depiction();
+            mol.straighten_depiction(minimizeRotation);
         }
         pickle = getPickleSafe(mol);
     }
@@ -247,12 +249,12 @@ const getNormPickle = (mol, { useCoordGen, normalize, canonicalize, straighten }
 }
 
 /**
-    * Add coordinates to the passed molecule.
-    * @param {JSMol} mol input molecule
-    * @param {boolean} useCoordGen whether new coordinates
-    * should be generated with CoordGen
-    * @returns {boolean} true if success, false if failure
-    */
+ * Add coordinates to the passed molecule.
+ * @param {JSMol} mol input molecule
+ * @param {boolean} useCoordGen whether new coordinates
+ * should be generated with CoordGen
+ * @returns {boolean} true if success, false if failure
+ */
 const setNewCoords = (mol, useCoordGen) => {
     let res = false;
     let exc = '';
@@ -309,14 +311,12 @@ const getDepiction = function({
     }
     if (mol) {
         try {
+            const hasCoords = mol.has_coords();
             const abbreviate = opts.ABBREVIATE;
-            const normalize = !opts.NO_MOL_NORMALIZE;
+            const normalize = !hasCoords || opts.RECOMPUTE2D || !opts.NO_MOL_NORMALIZE;
             let straighten = !opts.NO_MOL_STRAIGHTEN;
-            let canonicalize = straighten ? 1 : 0;
-            const allowAlignOnly = !opts.NO_ALIGN_ONLY;
-            const normalizeScaffold = !opts.NO_SCAFFOLD_NORMALIZE;
-            const straightenScaffold = !opts.NO_SCAFFOLD_STRAIGHTEN;
-            const canonicalizeScaffold = straightenScaffold ? 1 : 0;
+            let canonicalize = !hasCoords || opts.RECOMPUTE2D || !opts.NO_MOL_CANONICALIZE;
+            const allowAlignOnly = !opts.NO_ALIGN_ONLY && !opts.RECOMPUTE2D;
             switch (type) {
                 case 'c': {
                     useCoordGen = true;
@@ -324,11 +324,16 @@ const getDepiction = function({
                     break;
                 }
                 case 'a': {
+                    const straightenScaffold = !opts.NO_SCAFFOLD_STRAIGHTEN;
+                    let normalizeScaffold = !opts.NO_SCAFFOLD_NORMALIZE;
+                    let canonicalizeScaffold = !opts.NO_SCAFFOLD_CANONICALIZE;
                     match = {};
                     let scaffold = getMolSafe(rdkitModule, scaffoldText, { mergeQueryHs: true });
                     if (!scaffold) {
                         console.error(`Failed to generate RDKit scaffold`);
                     } else if (!scaffold.has_coords()) {
+                        normalizeScaffold = true;
+                        canonicalizeScaffold = true;
                         let res = setNewCoords(scaffold, true);
                         if (!res) {
                             res = setNewCoords(scaffold, false);
@@ -352,8 +357,11 @@ const getDepiction = function({
                                     useCoordGen: true,
                                     allowRGroups: true,
                                     acceptFailure: false,
-                                    alignOnly: allowAlignOnly && mol.has_coords(),
+                                    alignOnly: allowAlignOnly,
                                 })) || null);
+                                if (!match && (!hasCoords || opts.RECOMPUTE2D)) {
+                                    setNewCoords(mol, opts.RECOMPUTE2D);
+                                }
                             } catch(e) {
                                 console.error(`Exception in generate_aligned_coords (${e})`);
                                 match = null;
@@ -450,6 +458,7 @@ const getViewPortRect = () => ({
 export {
     decodeNewline,
     encodeNewline,
+    isBase64Pickle,
     isMolBlock,
     dataAttr,
     dashToCamelCase,
@@ -458,7 +467,6 @@ export {
     tagToKey,
     getMolblockFromMol,
     getMolSafe,
-    isBase64Pickle,
     extractBase64Pickle,
     getMolFromUInt8Array,
     getPickleSafe,

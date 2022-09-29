@@ -57,12 +57,13 @@ import {
     CLIPBOARD_OPTS,
     WHL_OPTS,
 } from './constants.js';
+import { version as packageVersion } from '../version.js';
 
 
 var _RDKitModule;
 
 const Renderer = {
-     /**
+    /**
      * Override to change, currently hardware concurrency minus 2.
      * @returns {number} Hardware concurrency
      */
@@ -387,6 +388,7 @@ const Renderer = {
             const TIMEOUT = 50;
             const RDK_LOADER_ID = this.getRdkStrRnrPrefix() + 'loader';
             if (typeof _RDKitModule === 'undefined') {
+                console.log(`rdkit-structure-renderer version: ${packageVersion}`);
                 _RDKitModule = null;
                 if (!document.getElementById(RDK_LOADER_ID)) {
                     const rdkitLoaderScript = document.createElement('script');
@@ -414,7 +416,7 @@ const Renderer = {
                         // window.RDKitModule = _RDKitModule;
                         // uncomment to have the Renderer available in console for debugging
                         // window.RDKitStructureRenderer = this;
-                        console.log('version: ' + _RDKitModule.version());
+                        console.log('RDKit version: ' + _RDKitModule.version());
                         return this;
                     })();
                 }
@@ -920,18 +922,16 @@ const Renderer = {
     },
 
     getPickledMolAndMatch: async function(divId, molText, scaffoldText, userOpts) {
-        const key = this.getCacheKey(divId);
-        const failsMatch = this.getFailsMatch(key, scaffoldText);
         const promArray = [];
         let res = null;
         // if the user wants to align to a scaffoldText or highlight
         // the scaffoldText, we need an aligned layout + matches
-        if (!failsMatch && (userOpts.SCAFFOLD_ALIGN || userOpts.SCAFFOLD_HIGHLIGHT)) {
+        if (userOpts.SCAFFOLD_ALIGN || userOpts.SCAFFOLD_HIGHLIGHT) {
             promArray.push(this.requestMolPickle(divId, molText, scaffoldText, userOpts));
         }
         // if the user does not want to align to a scaffoldText, we
         // need an unaligned layout
-        if (failsMatch || !userOpts.SCAFFOLD_ALIGN) {
+        if (!userOpts.SCAFFOLD_ALIGN) {
             promArray.push(this.requestMolPickle(divId, molText, null, {
                 ...userOpts,
                 SCAFFOLD_ALIGN: false,
@@ -1877,14 +1877,20 @@ const Renderer = {
 
     /**
      * For a given div, it will check if the div needs to be updated
-     * and will do so if needed.
-     * @param {string} divId
-     * @param {function} userOptsCallback optional callback
-     * @returns {boolean} whether the div was updated
+     * @param {Element|string} divOrDivId div or divId
+     * @returns {boolean} whether the div needs to be updated
      */
-    updateMolDrawDivIfNeeded: function(divId, userOptsCallback) {
+    shouldDraw: function(divOrDivId) {
         let shouldDraw = false;
-        const div = this.getMolDiv(divId);
+        let div;
+        let divId;
+        if (typeof divOrDivId === 'object') {
+            div = divOrDivId;
+            divId = div.id;
+        } else {
+            divId = divOrDivId;
+            div = this.getMolDiv(divId);
+        }
         if (!div) {
             return shouldDraw;
         }
@@ -1920,11 +1926,23 @@ const Renderer = {
                 return (typeof currentDivAttrValue !== 'undefined' && divAttrValue !== currentDivAttrValue);
             });
         }
+        return shouldDraw;
+    },
+
+    /**
+     * For a given div, it will check if the div needs to be updated
+     * and will do so if needed.
+     * @param {string} divId
+     * @param {function} userOptsCallback optional callback
+     * @returns {boolean} whether the div was updated
+     */
+    updateMolDrawDivIfNeeded: function(divId, userOptsCallback) {
         // if a redraw is needed, update
-        if (shouldDraw) {
+        const res = this.shouldDraw(divId);
+        if (res) {
             this.updateMolDrawDiv(divId, userOptsCallback);
         }
-        return shouldDraw;
+        return res;
     },
 
     /**

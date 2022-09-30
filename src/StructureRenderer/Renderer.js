@@ -1208,7 +1208,7 @@ const Renderer = {
      * @returns {string|Blob} a string if format is 'svg' or a Blob if 'png'
      */
     getImageFromDivIdOrKey: async function(divIdOrKey, opts) {
-        let res = Promise.resolve(null);
+        let res = null;
         const divId = this.getFirstDivIdFromDivIdOrKey(divIdOrKey);
         const key = this.getCacheKey(divId || divIdOrKey);
         const { mol, match } = await this.getMolAndMatchForKey(key) || {};

@@ -84,6 +84,7 @@ const USER_OPTS = {
 };
 
 const NO_MATCH = '_noMatch';
+const WAS_REBUILT = '_rebuilt';
 
 const CLIPBOARD_OPTS = {
     name: 'clipboard-write',
@@ -105,6 +106,7 @@ export {
     BUTTON_TYPES,
     USER_OPTS,
     NO_MATCH,
+    WAS_REBUILT,
     CLIPBOARD_OPTS,
     WHL_OPTS,
 };

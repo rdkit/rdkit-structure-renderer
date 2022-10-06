@@ -184,18 +184,7 @@ class SettingsDialog {
         const isChecked = this.fetchAndStoreBoolOpt(field);
         const userOpts = this.renderer.getAvailUserOpts();
         let func = () => null;
-        const isScaffoldAlign = (field === userOpts.SCAFFOLD_ALIGN.tag);
-        const recompute2DTag = userOpts.RECOMPUTE2D.tag;
-        // if the user has chosen to align against a scaffold,
-        // grey out the recompute2d checkbox as it would have
-        // no effect anyway
-        if (isScaffoldAlign) {
-            if (isChecked) {
-                this.renderOpt[recompute2DTag].checked = false;
-                this.renderer.updateUserOptCache(key, recompute2DTag, null);
-            }
-        }
-        if (isScaffoldAlign || field === recompute2DTag) {
+        if (field === userOpts.SCAFFOLD_ALIGN.tag || field === userOpts.RECOMPUTE2D.tag) {
             func = this.enableCopyMolblock.bind(this);
         }
         // while the 2D layout is being recomputed, disable
@@ -345,6 +334,12 @@ class SettingsDialog {
             || (drawOpts.bonds && Array.isArray(drawOpts.bonds) && drawOpts.bonds.length)
             ? enableAndMaybeCheck : disableAndUncheck;
         alignAction(userOpts.SCAFFOLD_ALIGN.tag);
+        // if the molecule coordinates were rebuilt ahead of the
+        // alignment, recompute2D would do nothing, so we disable it
+        const shouldAlign = this.renderOpt[userOpts.SCAFFOLD_ALIGN.tag].checked;
+        const recompute2DAction = shouldAlign && this.renderer.getWasRebuilt(key)
+            ? disableAndUncheck : enableAndMaybeCheck;
+        recompute2DAction(userOpts.RECOMPUTE2D.tag);
         highlightAction(userOpts.SCAFFOLD_HIGHLIGHT.tag);
     }
 

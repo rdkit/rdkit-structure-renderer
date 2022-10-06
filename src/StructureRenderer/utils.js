@@ -198,7 +198,7 @@ const getMolSafe = (rdkitModule, molText, get_mol_opts) => {
 /**
  * Returns the passed molecule as Uint8Array pickle.
  * @param {JSMol} mol input molecule
- * @returns pickled molecule as Uint8Array
+ * @returns {Uint8Array} pickled molecule
  */
 const getPickleSafe = (mol) => {
     let pickle;
@@ -218,34 +218,41 @@ const getPickleSafe = (mol) => {
  * - normalizing coordinates if normalize is true
  * - straightening the depiction if straighten is true
  * @param {JSMol} mol input molecule
+ * @param {boolean} rebuild whether coordinates should
+ * be generated even if already present
  * @param {boolean} useCoordGen whether CoordGen should be used
  * to generate 2D coordinates if the molecules has none
  * @param {boolean} normalize whether coordinates should be normalized
  * @param {number} canonicalize 0: do not canonicalize, 1: X axis, -1: Y axis
  * @param {boolean} straighten whether depiction should be straightened
- * @returns pickled molecule as Uint8Array
+ * @returns {object} object with two keys:
+ * {
+ *   pickle: Uint8Array; pickled molecule,
+ *   rebuild: boolean; true if the molecule coordinates were rebuilt
+ * }
  */
-const getNormPickle = (mol, { useCoordGen, normalize, canonicalize, straighten }) => {
+const getNormPickle = (mol, { rebuild, useCoordGen, normalize, canonicalize, straighten }) => {
     let pickle = '';
-    if (typeof canonicalize === 'undefined') {
+    let hasCoords = mol.has_coords();
+    rebuild = rebuild || !hasCoords;
+    if (rebuild || typeof canonicalize === 'undefined') {
         canonicalize = 1;
     }
-    let hasCoords = mol.has_coords();
-    let minimizeRotation = !canonicalize;
-    if (!hasCoords || useCoordGen) {
-        minimizeRotation = false;
+    if (rebuild || (normalize && mol.normalize_depiction(canonicalize) < 0.)) {
+        rebuild = true;
         hasCoords = setNewCoords(mol, useCoordGen);
     }
     if (hasCoords) {
-        if (normalize) {
-            mol.normalize_depiction(canonicalize);
+        if (rebuild) {
+            mol.normalize_depiction(1);
         }
-        if (straighten) {
+        if (rebuild || straighten) {
+            const minimizeRotation = !rebuild && !canonicalize;
             mol.straighten_depiction(minimizeRotation);
         }
         pickle = getPickleSafe(mol);
     }
-    return pickle;
+    return { pickle, rebuild };
 }
 
 /**
@@ -265,6 +272,9 @@ const setNewCoords = (mol, useCoordGen) => {
     }
     if (!res) {
         console.error(`Failed to generate coordinates${useCoordGen ? ' with CoordGen' : ''}${exc}`);
+        if (useCoordGen) {
+            return setNewCoords(mol, false);
+        }
     }
     return res;
 };
@@ -292,13 +302,16 @@ const getDepiction = function({
     molPickle,
     opts,
 }) {
-    let pickle = new Uint8Array();
+    opts = opts || {};
+    let rebuild = false;
+    const pickle = new Uint8Array();
     let match = null;
     let svg = null;
     let res = {
         pickle,
         match,
         svg,
+        rebuild,
     };
     let mol;
     let useCoordGen = false;
@@ -311,22 +324,25 @@ const getDepiction = function({
     }
     if (mol) {
         try {
-            const hasCoords = mol.has_coords();
+            rebuild = !mol.has_coords();
             const abbreviate = opts.ABBREVIATE;
-            const normalize = !hasCoords || opts.RECOMPUTE2D || !opts.NO_MOL_NORMALIZE;
-            let straighten = !opts.NO_MOL_STRAIGHTEN;
-            let canonicalize = !hasCoords || opts.RECOMPUTE2D || !opts.NO_MOL_CANONICALIZE;
-            const allowAlignOnly = !opts.NO_ALIGN_ONLY && !opts.RECOMPUTE2D;
+            const normalize = rebuild || !opts.NO_MOL_NORMALIZE;
+            let straighten = rebuild || !opts.NO_MOL_STRAIGHTEN;
+            let canonicalize = rebuild || !opts.NO_MOL_CANONICALIZE;
+            let allowAlignOnly = !opts.NO_ALIGN_ONLY && !opts.RECOMPUTE2D;
             switch (type) {
                 case 'c': {
+                    rebuild = true;
                     useCoordGen = true;
-                    pickle = getNormPickle(mol, { useCoordGen, normalize, canonicalize, straighten });
+                    Object.assign(res, getNormPickle(mol, { rebuild, useCoordGen, normalize, canonicalize, straighten }));
                     break;
                 }
                 case 'a': {
-                    const straightenScaffold = !opts.NO_SCAFFOLD_STRAIGHTEN;
+                    useCoordGen = opts.RECOMPUTE2D;
+                    let straightenScaffold = !opts.NO_SCAFFOLD_STRAIGHTEN;
                     let normalizeScaffold = !opts.NO_SCAFFOLD_NORMALIZE;
                     let canonicalizeScaffold = !opts.NO_SCAFFOLD_CANONICALIZE;
+                    let minimizeScaffoldRotation = !canonicalizeScaffold;
                     match = {};
                     let scaffold = getMolSafe(rdkitModule, scaffoldText, { mergeQueryHs: true });
                     if (!scaffold) {
@@ -334,11 +350,10 @@ const getDepiction = function({
                     } else if (!scaffold.has_coords()) {
                         normalizeScaffold = true;
                         canonicalizeScaffold = true;
-                        let res = setNewCoords(scaffold, true);
-                        if (!res) {
-                            res = setNewCoords(scaffold, false);
-                        }
-                        if (!res) {
+                        straightenScaffold = true;
+                        minimizeScaffoldRotation = false;
+                        const hasCoords = setNewCoords(scaffold, true);
+                        if (!hasCoords) {
                             scaffold.delete();
                             scaffold = null;
                             match = null;
@@ -346,54 +361,69 @@ const getDepiction = function({
                     }
                     if (scaffold) {
                         if (scaffold.is_valid()) {
-                            if (normalizeScaffold) {
-                                scaffold.normalize_depiction(canonicalizeScaffold);
+                            if (normalizeScaffold && scaffold.normalize_depiction(canonicalizeScaffold) < 0.) {
+                                console.error(`Scaffold has bad coordinates - ignoring it`);
+                                scaffold.delete();
+                                scaffold = null;
+                                match = null;
                             }
+                        }
+                    }
+                    if (scaffold) {
+                        if (scaffold.is_valid()) {
                             if (straightenScaffold) {
-                                scaffold.straighten_depiction();
+                                scaffold.straighten_depiction(minimizeScaffoldRotation);
                             }
                             try {
+                                if (normalize && mol.normalize_depiction(0) < 0.) {
+                                    rebuild = true;
+                                    allowAlignOnly = false;
+                                }
                                 match = JSON.parse(mol.generate_aligned_coords(scaffold, JSON.stringify({
                                     useCoordGen: true,
                                     allowRGroups: true,
                                     acceptFailure: false,
                                     alignOnly: allowAlignOnly,
                                 })) || null);
-                                if (!match && (!hasCoords || opts.RECOMPUTE2D)) {
-                                    setNewCoords(mol, opts.RECOMPUTE2D);
-                                }
                             } catch(e) {
                                 console.error(`Exception in generate_aligned_coords (${e})`);
                                 match = null;
                             }
-                            if (match && abbreviate) {
-                                try {
-                                    const molCopy = rdkitModule.get_mol_copy(mol);
-                                    const mapping = JSON.parse(molCopy.condense_abbreviations());
-                                    ["atoms", "bonds"].forEach(k => {
-                                        const invMapping = Array(mapping[k].reduce(
-                                            (prev, curr) => curr > prev ? curr : prev, -1) + 1).fill(-1);
-                                        mapping[k].forEach((idx, pos) => invMapping[idx] = pos);
-                                        match[k] = match[k].filter(i => invMapping[i] !== -1).map(i => invMapping[i]);
-                                    })
-                                    molCopy.delete();
-                                } catch(e) {
-                                    console.error(`Failed to apply abbreviations (${e})`);
-                                    match = null;
+                            if (match) {
+                                if (abbreviate) {
+                                    try {
+                                        const molCopy = rdkitModule.get_mol_copy(mol);
+                                        const mapping = JSON.parse(molCopy.condense_abbreviations());
+                                        ["atoms", "bonds"].forEach(k => {
+                                            const invMapping = Array(mapping[k].reduce(
+                                                (prev, curr) => curr > prev ? curr : prev, -1) + 1).fill(-1);
+                                            mapping[k].forEach((idx, pos) => invMapping[idx] = pos);
+                                            match[k] = match[k].filter(i => invMapping[i] !== -1).map(i => invMapping[i]);
+                                        })
+                                        molCopy.delete();
+                                    } catch(e) {
+                                        console.error(`Failed to apply abbreviations (${e})`);
+                                        match = null;
+                                    }
                                 }
                             }
                         }
                         scaffold.delete();
                     }
+                    const rebuildStored = rebuild;
                     if (match) {
+                        rebuild = false;
                         straighten = false;
                         canonicalize = 0;
                     }
-                    pickle = getNormPickle(mol, { useCoordGen, normalize, canonicalize, straighten });
+                    Object.assign(res, getNormPickle(mol, { rebuild, useCoordGen, normalize, canonicalize, straighten }));
+                    if (rebuildStored) {
+                        res.rebuild = rebuildStored;
+                    }
                     break;
                 }
                 case 'r': {
-                    pickle = getNormPickle(mol, { useCoordGen, normalize, canonicalize, straighten });
+                    Object.assign(res, getNormPickle(mol, { rebuild, useCoordGen, normalize, canonicalize, straighten }));
                     break;
                 }
                 case 's': {
@@ -409,7 +439,7 @@ const getDepiction = function({
                     break;
                 }
             }
-            Object.assign(res, { pickle, match, svg });
+            Object.assign(res, { match, svg });
         } finally {
             mol.delete();
         }

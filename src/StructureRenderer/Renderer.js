@@ -54,6 +54,7 @@ import {
     BUTTON_TYPES,
     USER_OPTS,
     NO_MATCH,
+    WAS_REBUILT,
     CLIPBOARD_OPTS,
     WHL_OPTS,
 } from './constants.js';
@@ -635,8 +636,8 @@ const Renderer = {
      * @param {string} scaffoldText scaffold description (SMILES, molblock or pkl_base64)
      * @param {object} opts rendering options
      * @returns {Promise} a Promise that will resolve to an object
-     * containing the mol pickle when the job is completed, or to null
-     * if the job is aborted before being submitted
+     * containing the mol pickle (and possibly other results depending on
+     * the job type), or to null if the job is aborted before being submitted
      */
     requestMolPickle: function(divId, molText, scaffoldText, opts) {
         if (!molText) {
@@ -644,6 +645,7 @@ const Renderer = {
                 pickle: null,
                 match: null,
                 svg: null,
+                rebuild: null,
             });
         }
         let type = 'r';
@@ -921,6 +923,16 @@ const Renderer = {
         return res;
     },
 
+    /**
+     * Request mol pickle for a given divId.
+     * @param {string} divId id of the div le molecule belongs to
+     * @param {string} molText molecule description (SMILES, molblock or pkl_base64)
+     * @param {string} scaffoldText scaffold description (SMILES, molblock or pkl_base64)
+     * @param {object} opts rendering options
+     * @returns {Promise} a Promise that will resolve to an object
+     * containing the mol pickle (and possibly other results depending on
+     * the job type), or to null if the job is aborted before being submitted
+     */
     getPickledMolAndMatch: async function(divId, molText, scaffoldText, userOpts) {
         const promArray = [];
         let res = null;
@@ -946,6 +958,7 @@ const Renderer = {
             const lastRes = resArray[resArray.length - 1];
             res = {
                 match: firstRes.match,
+                rebuild: firstRes.rebuild,
                 // the pickle will always be from the last promise
                 pickle: lastRes.pickle,
             };
@@ -988,7 +1001,7 @@ const Renderer = {
                 const molText = this.getMol(div);
                 res = await this.getPickledMolAndMatch(divId, molText, scaffoldText, userOpts) || {};
             }
-            const { pickle, match } = res;
+            const { pickle, match, rebuild } = res;
             if (pickle) {
                 this.setCurrentMol(key, pickle, match);
                 if (userOpts.SCAFFOLD_ALIGN || userOpts.SCAFFOLD_HIGHLIGHT) {
@@ -997,6 +1010,11 @@ const Renderer = {
                     } else {
                         this.clearFailsMatch(key);
                     }
+                }
+                if (rebuild) {
+                    this.setWasRebuilt(key);
+                } else {
+                    this.clearWasRebuilt(key);
                 }
                 if (userOpts.SCAFFOLD_HIGHLIGHT && match) {
                     Object.assign(drawOpts, match);
@@ -1716,7 +1734,7 @@ const Renderer = {
      * not to match the given scaffold definition.
      * @param {stringh} key cache key
      * @param {string} scaffold scaffold definition (SMILES or CTAB)
-     * @returns {boolean} true if the given div was previously
+     * @returns {boolean} true if the given key was previously
      * found not to match this scaffold, false if not
      */
     getFailsMatch: function(key, scaffold) {
@@ -1738,7 +1756,37 @@ const Renderer = {
      * @param {string} key cache key
      */
     clearFailsMatch: function(key) {
-        this.setFailsMatch(key, null);
+        this.updateUserOptCache(key, NO_MATCH, null);
+    },
+
+    /**
+     * Returns true if the given key had to undergo coordinate
+     * generation ahead of scaffold alignment (e.g., because
+     * existing coordinates were corrupted or non-existing).
+     * @param {stringh} key cache key
+     * @returns {boolean} true if the given key had to undergo
+     * coordinate generation ahead of alignment, false if not
+     */
+    getWasRebuilt: function(key) {
+        return this.getCachedValue(key, WAS_REBUILT);
+    },
+
+    /**
+     * Mark the given key as having had its coordinate rebuilt
+     * ahead of scaffold alignment.
+     * @param {string} key cache key
+     * @param {string} scaffold scaffold definition (SMILES or CTAB)
+     */
+    setWasRebuilt: function(key) {
+        this.updateUserOptCache(key, WAS_REBUILT, true);
+    },
+
+    /**
+     * Clear the 'was rebuilt' flag on the given key.
+     * @param {string} key cache key
+     */
+    clearWasRebuilt: function(key) {
+        this.updateUserOptCache(key, WAS_REBUILT, null);
     },
 
     /**
@@ -1824,8 +1872,9 @@ const Renderer = {
         let molDraw = this.getMolDraw(div);
         const { width, height } = this.getRoundedDivSize(div);
         if (width > 0 && height > 0) {
-            divAttrs[this.getDivAttrs().WIDTH] = width;
-            divAttrs[this.getDivAttrs().HEIGHT] = height;
+            const { WIDTH, HEIGHT } = this.getDivAttrs();
+            divAttrs[WIDTH] = width;
+            divAttrs[HEIGHT] = height;
             if (molDraw) {
                 this.resizeMolDraw(molDraw, width, height);
             }
@@ -1907,20 +1956,23 @@ const Renderer = {
         }
         // if it was seen before, we may still need to redraw
         // if some attribute changed
-        const allTags = [...this.allTags()];
         if (!shouldDraw) {
             const { width, height } = this.getRoundedDivSize(div);
-            if (!(width > 0 && height > 0)) {
-                delete allTags[this.getDivAttrs().WIDTH];
-                delete allTags[this.getDivAttrs().HEIGHT];
-            } else if (currentDivValue.width != width || currentDivValue.height != height) {
+            const areWidthHeightNonZero = (width > 0 && height > 0);
+            const currentWidth = parseInt(currentDivValue.width || '0');
+            const currentHeight = parseInt(currentDivValue.height || '0');
+            if (!areWidthHeightNonZero || currentWidth != width || currentHeight != height) {
                 shouldDraw = true;
                 this.setSpinnerWhlRadius(this.getSpinner(div), height);
                 this.getMolDraw(div).innerHTML = '';
             }
         }
         if (!shouldDraw) {
-            shouldDraw = allTags.some(tag => {
+            const widthHeightTags = [this.getDivAttrs().WIDTH, this.getDivAttrs().HEIGHT];
+            shouldDraw = this.allTags().some(tag => {
+                if (widthHeightTags.includes(tag)) {
+                    return false;
+                }
                 const divAttrValue = div.getAttribute(dataAttr(tag));
                 const currentDivAttrValue = currentDivValue[tag];
                 return (typeof currentDivAttrValue !== 'undefined' && divAttrValue !== currentDivAttrValue);

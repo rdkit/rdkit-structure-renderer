@@ -323,7 +323,7 @@ class SettingsDialog {
         const enableAndMaybeCheck = (tag) => {
             const control = this.renderOpt[tag];
             if (control.hasAttribute('disabled')) {
-                const isChecked = this.renderer.getBoolOpt(div, tag) || false;
+                const isChecked = this.renderer.getDivOpt(div, tag) || false;
                 control.checked = isChecked;
             }
             this.enableAction(control);
@@ -351,7 +351,7 @@ class SettingsDialog {
         this.molDiv = div;
         const key = this.renderer.getCacheKey(div);
         this.renderer.getCheckableUserOpts().forEach(opt =>
-            this.renderOpt[opt.tag].checked = this.renderer.getBoolOpt(div, opt.tag) || false);
+            this.renderOpt[opt.tag].checked = this.renderer.getDivOpt(div, opt.tag) || false);
         this.enableScaffoldOpts(div);
         const relatedNodes = this.renderer.getRelatedNodes(div);
         const dialogRelatives = Object.fromEntries(

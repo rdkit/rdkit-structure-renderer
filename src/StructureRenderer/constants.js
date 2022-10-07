@@ -74,13 +74,12 @@ const USER_OPTS = {
     SCAFFOLD_HIGHLIGHT: 'Highlight scaffold',
     ABBREVIATE: 'Abbreviate groups',
     ATOM_IDX: 'Add atom indices',
-    NO_MOL_NORMALIZE: null,
-    NO_MOL_STRAIGHTEN: null,
-    NO_MOL_CANONICALIZE: null,
-    NO_SCAFFOLD_NORMALIZE: null,
-    NO_SCAFFOLD_STRAIGHTEN: null,
-    NO_SCAFFOLD_CANONICALIZE: null,
-    NO_ALIGN_ONLY: null,
+    MOL_NORMALIZE: null,
+    MOL_STRAIGHTEN: null,
+    MOL_CANONICALIZE: null,
+    SCAFFOLD_NORMALIZE: null,
+    SCAFFOLD_STRAIGHTEN: null,
+    SCAFFOLD_CANONICALIZE: null,
 };
 
 const NO_MATCH = '_noMatch';

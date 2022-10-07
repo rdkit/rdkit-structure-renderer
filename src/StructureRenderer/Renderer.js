@@ -209,7 +209,7 @@ const Renderer = {
      */
     setAvailUserOpts: function(userOpts) {
         this._userOpts = Object.fromEntries(
-            Object.entries(userOpts || USER_OPTS).map(([k, text]) =>
+            Object.entries(userOpts || this.getDefaultUserOpts()).map(([k, text]) =>
                 [k, { tag: keyToTag(k), text }]));
     },
 
@@ -265,13 +265,14 @@ const Renderer = {
     },
 
     /**
-     * Get boolean user options for a given div or divId.
+     * Get boolean or string user options for a given div or divId.
      * @param {Element|string} div div or divId
-     * @returns {object} dictionary mapping each userOpt key to its boolean value
+     * @returns {object} dictionary mapping each userOpt key to its
+     * boolean or string value
      */
     getUserOptsForDiv: function(div) {
         return Object.fromEntries(Object.entries(this.getAvailUserOpts()).map(
-            ([k, { tag }]) => [k, this.getBoolOpt(div, tag)]).filter(
+            ([k, { tag }]) => [k, this.getDivOpt(div, tag)]).filter(
                 ([, v]) => typeof v !== 'undefined'));
     },
 
@@ -416,7 +417,7 @@ const Renderer = {
                         // uncomment to have the RDKitModule available in console for debugging
                         // window.RDKitModule = _RDKitModule;
                         // uncomment to have the Renderer available in console for debugging
-                        // window.RDKitStructureRenderer = this;
+                        window.RDKitStructureRenderer = this;
                         console.log('RDKit version: ' + _RDKitModule.version());
                         return this;
                     })();
@@ -862,12 +863,12 @@ const Renderer = {
     },
 
     /**
-     * For a given div, set the boolean value of an option.
+     * For a given div, set the value of an option.
      * @param {Element} div
      * @param {string}  opt HTML tag name holding the option value
      * @param {boolean} value
      */
-    setBoolOpt: function(div, opt, value) {
+    setDivOpt: function(div, opt, value) {
         div.setAttribute(dataAttr(opt), value ? true : false);
     },
 
@@ -1674,10 +1675,10 @@ const Renderer = {
     /**
      * Get the value of a user-defined boolean option from cache
      * for a given key.
-     * If the cached value does not exist, returns unspecified
+     * If the cached value does not exist, returns undefined
      * @param {string} key cache key
      * @param {string} userOpt name of the user-defined option
-     * @returns {boolean|string} cached value, or unspecified if there
+     * @returns {boolean|string} cached value, or undefined if there
      * is no value associated to userOpt in the cache
      *
      */
@@ -1691,39 +1692,46 @@ const Renderer = {
     },
 
     /**
-     * Get the value of a user-defined boolean option from cache
-     * for a given div or divId.
+     * Get the value of a user-defined option from cache for a given div
+     * or divId. If the value can be converted to a boolean, the value
+     * is returned as a boolean, otherwise the value is returned as
+     * a string. If no value is found, undefined is returned.
      * Note that the div is identified by a key computed by getCacheKey().
-     * If no cached value exists, the value read from the div is returned,
-     * or false if a divId is passed.
+     * If no cached value exists, the value read from the div is returned.
+     * If the div has no value, or a divId is passed, undefined is returned.
      * @param {Element|string} div div or divId
      * @param {string} userOpt name of the user-defined option
-     * @returns {boolean} true if the option is checked,
-     * false if not checked or not found
+     * @returns {any} value if the value was found, undefined if the value
+     * was not found
      */
-    getBoolOpt: function(div, userOpt) {
+    getDivOpt: function(div, userOpt) {
         const key = this.getCacheKey(div);
         let res = this.getCachedValue(key, userOpt);
         if (typeof res === 'undefined' && typeof div !== 'string') {
-            res = this.toBool(div.getAttribute(dataAttr(userOpt)));
+            res = div.getAttribute(dataAttr(userOpt));
         }
-        return res;
+        return this.toBool(res);
     },
 
     /**
-     * Convert HTML attribute to bool.
-     * @param {string} v HTML value obtained calling Element.getAttribute
-     * @returns true if v is a string and truthy, false if v is a string
-     * and falsy, otherwise undefined
+     * Convert HTML attribute to bool if possible.
+     * @param {string|null} v HTML value obtained calling Element.getAttribute
+     * @returns true or false if v can be converted to boolean, otherwise v
+     * as a string, or undefined if v is null
      */
-    toBool: (v) => {
+     toBool: (v) => {
         let res;
+        if (typeof v === 'boolean') {
+            return v;
+        }
         if (typeof v === 'string') {
-            v = v.toLowerCase();
-            if (v === 'false' || v === '0' || v === 'null') {
+            const c = v.substring(0, 1).toLowerCase();
+            if (c && 'fn0'.includes(c)) {
                 res = false;
-            } else if (v === 'true' || v === '1' || v === '') {
+            } else if (!c || 'ty1'.includes(c)) {
                 res = true;
+            } else {
+                res = v;
             }
         }
         return res;

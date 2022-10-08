@@ -74,13 +74,16 @@ const USER_OPTS = {
     SCAFFOLD_HIGHLIGHT: 'Highlight scaffold',
     ABBREVIATE: 'Abbreviate groups',
     ATOM_IDX: 'Add atom indices',
-    NO_MOL_NORMALIZE: null,
-    NO_MOL_STRAIGHTEN: null,
-    NO_SCAFFOLD_NORMALIZE: null,
-    NO_SCAFFOLD_STRAIGHTEN: null
+    MOL_NORMALIZE: null,
+    MOL_STRAIGHTEN: null,
+    MOL_CANONICALIZE: null,
+    SCAFFOLD_NORMALIZE: null,
+    SCAFFOLD_STRAIGHTEN: null,
+    SCAFFOLD_CANONICALIZE: null,
 };
 
 const NO_MATCH = '_noMatch';
+const WAS_REBUILT = '_rebuilt';
 
 const CLIPBOARD_OPTS = {
     name: 'clipboard-write',
@@ -102,6 +105,7 @@ export {
     BUTTON_TYPES,
     USER_OPTS,
     NO_MATCH,
+    WAS_REBUILT,
     CLIPBOARD_OPTS,
     WHL_OPTS,
 };

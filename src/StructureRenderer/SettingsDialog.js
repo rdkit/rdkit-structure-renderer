@@ -184,20 +184,7 @@ class SettingsDialog {
         const isChecked = this.fetchAndStoreBoolOpt(field);
         const userOpts = this.renderer.getAvailUserOpts();
         let func = () => null;
-        const isScaffoldAlign = (field === userOpts.SCAFFOLD_ALIGN.tag);
-        const recompute2DTag = userOpts.RECOMPUTE2D.tag;
-        // if the user has chosen to align against a scaffold,
-        // grey out the recompute2d checkbox as it would have
-        // no effect anyway
-        if (isScaffoldAlign) {
-            if (isChecked) {
-                this.renderOpt[recompute2DTag].checked = false;
-                this.renderer.updateUserOptCache(key, recompute2DTag, null);
-            }
-            const recompute2DAction = isChecked ? this.disableAction : this.enableAction;
-            recompute2DAction(this.renderOpt[recompute2DTag]);
-        }
-        if (isScaffoldAlign || field === recompute2DTag) {
+        if (field === userOpts.SCAFFOLD_ALIGN.tag || field === userOpts.RECOMPUTE2D.tag) {
             func = this.enableCopyMolblock.bind(this);
         }
         // while the 2D layout is being recomputed, disable
@@ -316,15 +303,17 @@ class SettingsDialog {
      * @param {Element} div
      */
     enableScaffoldOpts(div) {
-        const scaffold = this.renderer.getScaffold(div);
-        const key = this.renderer.getCacheKey(div);
-        const hasScaffold = scaffold && !this.renderer.getFailsMatch(key, scaffold);
         const userOpts = this.renderer.getAvailUserOpts();
         const drawOpts = this.renderer.getDrawOpts(div);
-        // enable scaffold alignment only if a scaffold
-        // definition is available
-        // enable scaffold highlighting only if a scaffold
-        // definition is available, or if drawOpts has a non-empty
+        const scaffold = this.renderer.getScaffold(div);
+        const key = this.renderer.getCacheKey(div);
+        const hasScaffold = !!scaffold;
+        const failsMatch = hasScaffold && this.renderer.getFailsMatch(key, scaffold);
+        const canAlign = hasScaffold && !failsMatch;
+        // enable scaffold alignment only if a scaffold definition is available
+        // and if that has not failed to match before
+        // enable scaffold highlighting only if a scaffold definition is available
+        // and if that has not failed to match before, or if drawOpts has a non-empty
         // "atoms" attribute
         const disableAndUncheck = (tag) => {
             const control = this.renderOpt[tag];
@@ -334,23 +323,24 @@ class SettingsDialog {
         const enableAndMaybeCheck = (tag) => {
             const control = this.renderOpt[tag];
             if (control.hasAttribute('disabled')) {
-                const isChecked = this.renderer.getBoolOpt(div, tag) || false;
+                const isChecked = this.renderer.getDivOpt(div, tag) || false;
                 control.checked = isChecked;
             }
             this.enableAction(control);
         };
-        const alignAction = hasScaffold ? enableAndMaybeCheck : disableAndUncheck;
-        const highlightAction = hasScaffold
+        const alignAction = canAlign ? enableAndMaybeCheck : disableAndUncheck;
+        const highlightAction = canAlign
             || (drawOpts.atoms && Array.isArray(drawOpts.atoms) && drawOpts.atoms.length)
             || (drawOpts.bonds && Array.isArray(drawOpts.bonds) && drawOpts.bonds.length)
             ? enableAndMaybeCheck : disableAndUncheck;
         alignAction(userOpts.SCAFFOLD_ALIGN.tag);
+        // if the molecule coordinates were rebuilt ahead of the
+        // alignment, recompute2D would do nothing, so we disable it
+        const shouldAlign = this.renderOpt[userOpts.SCAFFOLD_ALIGN.tag].checked;
+        const recompute2DAction = shouldAlign && this.renderer.getWasRebuilt(key)
+            ? disableAndUncheck : enableAndMaybeCheck;
+        recompute2DAction(userOpts.RECOMPUTE2D.tag);
         highlightAction(userOpts.SCAFFOLD_HIGHLIGHT.tag);
-        const shouldAlign = hasScaffold && (this.renderer.getBoolOpt(
-            div, userOpts.SCAFFOLD_ALIGN.tag) || false);
-        // enable recompute2D only if alignment to scaffold is unchecked
-        const recompute2DAction = shouldAlign ? this.disableAction : this.enableAction;
-        recompute2DAction(this.renderOpt[userOpts.RECOMPUTE2D.tag]);
     }
 
     /**
@@ -361,7 +351,7 @@ class SettingsDialog {
         this.molDiv = div;
         const key = this.renderer.getCacheKey(div);
         this.renderer.getCheckableUserOpts().forEach(opt =>
-            this.renderOpt[opt.tag].checked = this.renderer.getBoolOpt(div, opt.tag) || false);
+            this.renderOpt[opt.tag].checked = this.renderer.getDivOpt(div, opt.tag) || false);
         this.enableScaffoldOpts(div);
         const relatedNodes = this.renderer.getRelatedNodes(div);
         const dialogRelatives = Object.fromEntries(

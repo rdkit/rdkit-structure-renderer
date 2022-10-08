@@ -45,10 +45,17 @@ const decodeNewline = s => s.replace(/&#10;/g, '\n');
 const encodeNewline = s => s.replace(/\n/g, '&#10;');
 
 /**
+ * Return True if the passed string is a pkl_base64
+ * @param {string} molText SMILES, CTAB or pkl_base64
+ * @returns {boolean} True if pkl_base64
+ */
+const isBase64Pickle = (molText) => molText.startsWith('pkl_');
+
+/**
  * Return true if molblock is an MDL molblock.
  * @returns {string} true if MDL molblock
  */
-const isMolBlock = molText => molText.includes('M  END');
+const isMolBlock = molText => !isBase64Pickle(molText) && molText.includes('M  END');
 
 /**
  * Return 'data-' prefixed attr.
@@ -133,13 +140,6 @@ const getMolblockFromMol = mol => {
 }
 
 /**
- * Return True if the passed string is a pkl_base64
- * @param {string} molText SMILES, CTAB or pkl_base64
- * @returns {boolean} True if pkl_base64
- */
-const isBase64Pickle = (molText) => molText.startsWith('pkl_');
-
-/**
  * Extract pickle from a pkl_base64 string
  * @param {string} molText pkl_base64 string
  * @returns {Uint8Array} Uint8Array pickle
@@ -149,57 +149,10 @@ const extractBase64Pickle = (molText) => Uint8Array.from(
 );
 
 /**
- * Generate molecule from SMILES, CTAB or pkl_base64.
- * @param {string} molText SMILES, CTAB or pkl_base64
- * @returns {JSMol} molecule or null in case of failure
+ * Returns the passed molecule as Uint8Array pickle.
+ * @param {JSMol} mol input molecule
+ * @returns {Uint8Array} pickled molecule
  */
-const getMolSafe = (rdkitModule, molText, get_mol_opts) => {
-    if (isBase64Pickle(molText)) {
-        const molPickle = extractBase64Pickle(molText);
-        return getMolFromUInt8Array(rdkitModule, molPickle);
-    }
-    const FALLBACK_OPS = ['kekulize', 'sanitize'];
-    // this is called recursively until success
-    // or until FALLBACK_OPS are available
-    const _getMolSafe = opIdx => {
-        let exc = '';
-        let mol = null;
-        let opts = get_mol_opts || {};
-        let op;
-        if (typeof opIdx === 'number') {
-            op = FALLBACK_OPS[opIdx];
-            opts[op] = false;
-        } else {
-            opIdx = -1;
-        }
-        try {
-            mol = rdkitModule.get_mol(molText, JSON.stringify(opts));
-        } catch(e) {
-            exc = ` (${e})`;
-        }
-        if (!mol?.is_valid()) {
-            if (mol) {
-                mol.delete();
-                mol = null;
-            }
-            if (++opIdx < FALLBACK_OPS.length) {
-                return _getMolSafe(opIdx);
-            } else {
-                console.error(`Failed to generate RDKit mol${exc}`);
-            }
-        } else if (op) {
-            console.error(`Failed to ${op} RDKit mol${exc}`);
-        }
-        return mol;
-    }
-    return _getMolSafe();
-};
-
-/**
-    * Returns the passed molecule as Uint8Array pickle.
-    * @param {JSMol} mol input molecule
-    * @returns pickled molecule as Uint8Array
-    */
 const getPickleSafe = (mol) => {
     let pickle;
     try {
@@ -209,62 +162,6 @@ const getPickleSafe = (mol) => {
         pickle = new Uint8Array();
     }
     return pickle;
-};
-
-/**
-    * Returns the passed molecule as Uint8Array pickle
-    * after:
-    * - generating coordinates if it has none
-    * - normalizing coordinates if normalize is true
-    * - straightening the depiction if straighten is true
-    * @param {JSMol} mol input molecule
-    * @param {boolean} useCoordGen whether CoordGen should be used
-    * to generate 2D coordinates if the molecules has none
-    * @param {boolean} normalize whether coordinates should be normalized
-    * @param {number} canonicalize 0: do not canonicalize, 1: X axis, -1: Y axis
-    * @param {boolean} straighten whether depiction should be straightened
-    * @returns pickled molecule as Uint8Array
-    */
-const getNormPickle = (mol, { useCoordGen, normalize, canonicalize, straighten }) => {
-    let pickle = '';
-    if (typeof canonicalize === 'undefined') {
-        canonicalize = 1;
-    }
-    let hasCoords = mol.has_coords();
-    if (!hasCoords || useCoordGen) {
-        hasCoords = setNewCoords(mol, useCoordGen);
-    }
-    if (hasCoords) {
-        if (normalize) {
-            mol.normalize_depiction(canonicalize);
-        }
-        if (straighten) {
-            mol.straighten_depiction();
-        }
-        pickle = getPickleSafe(mol);
-    }
-    return pickle;
-}
-
-/**
-    * Add coordinates to the passed molecule.
-    * @param {JSMol} mol input molecule
-    * @param {boolean} useCoordGen whether new coordinates
-    * should be generated with CoordGen
-    * @returns {boolean} true if success, false if failure
-    */
-const setNewCoords = (mol, useCoordGen) => {
-    let res = false;
-    let exc = '';
-    try {
-        res = mol.set_new_coords(useCoordGen)
-    } catch(e) {
-        exc = ` (${e})`;
-    }
-    if (!res) {
-        console.error(`Failed to generate coordinates${useCoordGen ? ' with CoordGen' : ''}${exc}`);
-    }
-    return res;
 };
 
 const cssToText = (keyValueDict, indent) => {
@@ -280,126 +177,6 @@ const cssToText = (keyValueDict, indent) => {
             ), ''
         ) + _indentBy(indent - 1) + '}\n\n', ''
     ).trimEnd() + '\n';
-};
-
-const getDepiction = function({
-    rdkitModule,
-    type,
-    molText,
-    scaffoldText,
-    molPickle,
-    opts,
-}) {
-    let pickle = new Uint8Array();
-    let match = null;
-    let svg = null;
-    let res = {
-        pickle,
-        match,
-        svg,
-    };
-    let mol;
-    let useCoordGen = false;
-    if (type) {
-        if (molText) {
-            mol = getMolSafe(rdkitModule, molText);
-        } else if (molPickle) {
-            mol = getMolFromUInt8Array(rdkitModule, molPickle);
-        }
-    }
-    if (mol) {
-        try {
-            const abbreviate = opts.ABBREVIATE;
-            const normalize = !opts.NO_MOL_NORMALIZE;
-            let straighten = !opts.NO_MOL_STRAIGHTEN;
-            let canonicalize = straighten ? 1 : 0;
-            const normalizeScaffold = !opts.NO_SCAFFOLD_NORMALIZE;
-            const straightenScaffold = !opts.NO_SCAFFOLD_STRAIGHTEN;
-            const canonicalizeScaffold = straightenScaffold ? 1 : 0;
-            switch (type) {
-                case 'c': {
-                    useCoordGen = true;
-                    pickle = getNormPickle(mol, { useCoordGen, normalize, canonicalize, straighten });
-                    break;
-                }
-                case 'a': {
-                    match = {};
-                    let scaffold = getMolSafe(rdkitModule, scaffoldText, { mergeQueryHs: true });
-                    if (!scaffold) {
-                        console.error(`Failed to generate RDKit scaffold`);
-                    } else if (!scaffold.has_coords()) {
-                        let res = setNewCoords(scaffold, true);
-                        if (!res) {
-                            res = setNewCoords(scaffold, false);
-                        }
-                        if (!res) {
-                            scaffold.delete();
-                            scaffold = null;
-                            match = null;
-                        }
-                    }
-                    if (scaffold) {
-                        if (scaffold.is_valid()) {
-                            if (normalizeScaffold) {
-                                scaffold.normalize_depiction(canonicalizeScaffold);
-                            }
-                            if (straightenScaffold) {
-                                scaffold.straighten_depiction();
-                            }
-                            try {
-                                match = JSON.parse(mol.generate_aligned_coords(scaffold, true, true, false));
-                            } catch {
-                                match = null;
-                            }
-                            if (match && abbreviate) {
-                                try {
-                                    const molCopy = rdkitModule.get_mol_copy(mol);
-                                    const mapping = JSON.parse(molCopy.condense_abbreviations());
-                                    ["atoms", "bonds"].forEach(k => {
-                                        const invMapping = Array(mapping[k].reduce(
-                                            (prev, curr) => curr > prev ? curr : prev, -1) + 1).fill(-1);
-                                        mapping[k].forEach((idx, pos) => invMapping[idx] = pos);
-                                        match[k] = match[k].filter(i => invMapping[i] !== -1).map(i => invMapping[i]);
-                                    })
-                                    molCopy.delete();
-                                } catch(e) {
-                                    console.error(`Failed to apply abbreviations (${e})`);
-                                    match = null;
-                                }
-                            }
-                        }
-                        scaffold.delete();
-                    }
-                    if (match) {
-                        straighten = false;
-                        canonicalize = 0;
-                    }
-                    pickle = getNormPickle(mol, { useCoordGen, normalize, canonicalize, straighten });
-                    break;
-                }
-                case 'r': {
-                    pickle = getNormPickle(mol, { useCoordGen, normalize, canonicalize, straighten });
-                    break;
-                }
-                case 's': {
-                    if (abbreviate) {
-                        mol.condense_abbreviations();
-                    }
-                    const drawOptsText = JSON.stringify(opts.drawOpts || {});
-                    svg = mol.get_svg_with_highlights(drawOptsText);
-                    break;
-                }
-                default: {
-                    console.error(`Unknown message type ${type}`);
-                    break;
-                }
-            }
-            Object.assign(res, { pickle, match, svg });
-        } finally {
-            mol.delete();
-        }
-    }
-    return res;
 };
 
 /**
@@ -443,6 +220,7 @@ const getViewPortRect = () => ({
 export {
     decodeNewline,
     encodeNewline,
+    isBase64Pickle,
     isMolBlock,
     dataAttr,
     dashToCamelCase,
@@ -450,14 +228,9 @@ export {
     keyToTag,
     tagToKey,
     getMolblockFromMol,
-    getMolSafe,
-    isBase64Pickle,
     extractBase64Pickle,
     getMolFromUInt8Array,
     getPickleSafe,
-    getNormPickle,
-    setNewCoords,
-    getDepiction,
     cssToText,
     getElementCenter,
     getViewPortRect,

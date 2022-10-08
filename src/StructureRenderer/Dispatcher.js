@@ -30,16 +30,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-import {
-    getMolSafe,
-    getMolFromUInt8Array,
-    getNormPickle,
-    isBase64Pickle,
-    extractBase64Pickle,
-    getPickleSafe,
-    setNewCoords,
-    getDepiction
-} from './utils.js';
+import Depiction from './Worker.js';
 
 class Dispatcher {
     constructor(id, minimalLibPath) {
@@ -61,14 +52,7 @@ class Dispatcher {
 const rdkitReady = initRDKitModule({
     locateFile: (path) => '${minimalLibPath}/' + path,
 });
-const ${isBase64Pickle.name} = ${isBase64Pickle};
-const ${extractBase64Pickle.name} = ${extractBase64Pickle};
-const ${getMolFromUInt8Array.name} = ${getMolFromUInt8Array};
-const ${getPickleSafe.name} = ${getPickleSafe};
-const ${getMolSafe.name} = ${getMolSafe};
-const ${getNormPickle.name} = ${getNormPickle};
-const ${setNewCoords.name} = ${setNewCoords};
-const getDepiction = ${getDepiction};
+const Depiction = {${Object.keys(Depiction).map(k => `${k}: ${Depiction[k]}`).join(',')}};
 
 const main = (rdkitReady, dispatcherId) => {
     onmessage = ({ data }) => rdkitReady.then(rdkitModule => {
@@ -78,7 +62,7 @@ const main = (rdkitReady, dispatcherId) => {
         }
         delete data.wPort;
         data.rdkitModule = rdkitModule;
-        wPort.postMessage(getDepiction(data));
+        wPort.postMessage(Depiction.get(data));
         wPort.close();
     });
     console.log('worker ' + dispatcherId.toString() + ' ready');

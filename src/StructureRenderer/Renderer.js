@@ -1000,7 +1000,7 @@ const Renderer = {
             const divId = this.getDivId(div);
             if (!res) {
                 const molText = this.getMol(div);
-                res = await this.getPickledMolAndMatch(divId, molText, scaffoldText, userOpts) || {};
+                res = await this.getPickledMolAndMatch(divId, molText, scaffoldText, { drawOpts, ...userOpts }) || {};
             }
             const { pickle, match, rebuild } = res;
             if (pickle) {
@@ -1565,6 +1565,8 @@ const Renderer = {
         if (molDraw.nodeName === 'CANVAS') {
             molDraw.width = width * scale;
             molDraw.height = height * scale;
+            const ctx = molDraw.getContext('2d');
+            ctx && ctx.scale(scale, scale);
         }
         molDraw.setAttribute('style', `width: ${width}px; height: ${height}px;`);
     },
@@ -1726,9 +1728,9 @@ const Renderer = {
         }
         if (typeof v === 'string') {
             const c = v.substring(0, 1).toLowerCase();
-            if (c && 'fn0'.includes(c)) {
+            if (c && 'fn'.includes(c)) {
                 res = false;
-            } else if (!c || 'ty1'.includes(c)) {
+            } else if (!c || 'ty'.includes(c)) {
                 res = true;
             } else {
                 res = v;

@@ -105,16 +105,15 @@ const Depiction = {
     getNormPickle: function(mol, { rebuild, useCoordGen, normalize, canonicalize, straighten }) {
         let pickle = '';
         let hasCoords = mol.has_coords();
-        const canonicalizeType = (rebuild || canonicalize ? 1 : 0);
         const scaleFac = (normalize ? -1. : 1.);
         rebuild = rebuild || !hasCoords;
-        if (rebuild || mol.normalize_depiction(canonicalizeType, scaleFac) < 0.) {
+        if (rebuild || mol.normalize_depiction(canonicalize, scaleFac) < 0.) {
             rebuild = true;
             hasCoords = this.setNewCoords(mol, useCoordGen);
         }
         if (hasCoords) {
             if (rebuild) {
-                mol.normalize_depiction(canonicalizeType, scaleFac);
+                mol.normalize_depiction(canonicalize, scaleFac);
             }
             if (straighten) {
                 const minimizeRotation = !rebuild && !canonicalize;
@@ -177,15 +176,20 @@ const Depiction = {
             try {
                 rebuild = !mol.has_coords();
                 const abbreviate = opts.ABBREVIATE;
+                let { drawOpts } = opts;
+                drawOpts = drawOpts || {};
+                const { width, height } = drawOpts;
+                const canonicalizeDir = (typeof width === 'number'
+                    && typeof height === 'number' && width < height ? -1 : 1);
                 setBehavior({
                     MOL_NORMALIZE: true,
-                    MOL_CANONICALIZE: rebuild,
+                    MOL_CANONICALIZE: rebuild || opts.RECOMPUTE2D,
                     MOL_STRAIGHTEN: true,
                     ALIGN_REBUILD: opts.RECOMPUTE2D,
                 });
                 const normalize = behavior.MOL_NORMALIZE;
                 let straighten = behavior.MOL_STRAIGHTEN;
-                let canonicalize = behavior.MOL_CANONICALIZE;
+                let canonicalize = (behavior.MOL_CANONICALIZE ? canonicalizeDir : 0);
                 let alignRebuild = behavior.ALIGN_REBUILD;
                 switch (type) {
                     case 'c': {
@@ -197,16 +201,16 @@ const Depiction = {
                     case 'a': {
                         useCoordGen = opts.RECOMPUTE2D;
                         setBehavior({
-                            SCAFFOLD_NORMALIZE: false,
+                            SCAFFOLD_NORMALIZE: true,
                             SCAFFOLD_CANONICALIZE: false,
                             SCAFFOLD_STRAIGHTEN: true,
                         });
                         let straightenScaffold = behavior.SCAFFOLD_STRAIGHTEN;
                         let normalizeScaffold = behavior.SCAFFOLD_NORMALIZE;
-                        let canonicalizeScaffold = behavior.SCAFFOLD_CANONICALIZE;
+                        let canonicalizeScaffold = (behavior.SCAFFOLD_CANONICALIZE ? canonicalizeDir : 0);
                         let minimizeScaffoldRotation = !behavior.SCAFFOLD_CANONICALIZE;
                         match = {};
-                        let scaffold = this.getMolSafe(rdkitModule, scaffoldText, { mergeQueryHs: true });
+                        let scaffold = this.getMolSafe(rdkitModule, scaffoldText, { removeHs: false, mergeQueryHs: true });
                         if (!scaffold) {
                             console.error(`Failed to generate RDKit scaffold`);
                         } else if (!scaffold.has_coords()) {
@@ -214,7 +218,7 @@ const Depiction = {
                                 normalizeScaffold = true;
                             }
                             if (isBehaviorAuto.SCAFFOLD_CANONICALIZE) {
-                                canonicalizeScaffold = true;
+                                canonicalizeScaffold = canonicalizeDir;
                             }
                             if (isBehaviorAuto.SCAFFOLD_STRAIGHTEN) {
                                 straightenScaffold = true;
@@ -302,8 +306,15 @@ const Depiction = {
                         if (abbreviate) {
                             mol.condense_abbreviations();
                         }
-                        const drawOptsText = JSON.stringify(opts.drawOpts || {});
-                        svg = mol.get_svg_with_highlights(drawOptsText);
+                        [0, 1].some(_ => {
+                            const drawOptsText = JSON.stringify(drawOpts);
+                            try {
+                                svg = mol.get_svg_with_highlights(drawOptsText);
+                            } catch {
+                                drawOpts.kekulize = false;
+                            }
+                            return svg;
+                        });
                         break;
                     }
                     default: {

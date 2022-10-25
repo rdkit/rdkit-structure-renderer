@@ -306,7 +306,7 @@ const Depiction = {
                         if (abbreviate) {
                             mol.condense_abbreviations();
                         }
-                        [0, 1].some(_ => {
+                        [0, 1].some(() => {
                             const drawOptsText = JSON.stringify(drawOpts);
                             try {
                                 svg = mol.get_svg_with_highlights(drawOptsText);

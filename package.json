@@ -5,7 +5,7 @@
     "main": "pkg/dist-src/index.js",
     "scripts": {
         "test": "echo \"Error: no test specified\" && exit 1",
-        "postinstall": "genversion --es6 --semi src/version.js",
+        "postinstall": "npx genversion --es6 --semi src/version.js",
         "build": "npm run build:pkg && npm run build:prod",
         "build:dev": "webpack --mode=development",
         "build:prod": "webpack --mode=production --node-env=production",

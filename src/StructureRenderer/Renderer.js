@@ -380,7 +380,7 @@ const Renderer = {
                 minimalLibPath = document.currentScript?.src || '';
             }
             this._minimalLibPath = minimalLibPath.substring(0, minimalLibPath.lastIndexOf('/'));
-            this._minimalLibJs = `${this._minimalLibPath}/RDKit_minimal.js`;
+            this._minimalLibJs = `${this._minimalLibPath}/RDKit_minimal.${packageVersion}.js`;
             // create the Scheduler (which in turn may spawn WebWorkers)
             // if it has not been created yet
             this.scheduler();
@@ -407,7 +407,9 @@ const Renderer = {
                     if (typeof initRDKitModule !== 'function') {
                         throw Error('_loadRDKitModule: initRDKitModule is not a function');
                     }
-                    _RDKitModule = window.initRDKitModule();
+                    _RDKitModule = window.initRDKitModule({
+                        locateFile: () => `${this._minimalLibPath}/RDKit_minimal.${packageVersion}.wasm`
+                    });
                     res = (async () => {
                         _RDKitModule = await _RDKitModule;
                         if (!this.isRDKitReady()) {

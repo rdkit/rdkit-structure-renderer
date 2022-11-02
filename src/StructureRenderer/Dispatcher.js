@@ -31,6 +31,7 @@
 //
 
 import Depiction from './Worker.js';
+import { version as packageVersion } from '../version.js';
 
 class Dispatcher {
     constructor(id, minimalLibPath) {
@@ -48,9 +49,9 @@ class Dispatcher {
      */
      getWorkerBlob(minimalLibPath) {
         return [
-`importScripts('${minimalLibPath}/RDKit_minimal.js');
+`importScripts('${minimalLibPath}/RDKit_minimal.${packageVersion}.js');
 const rdkitReady = initRDKitModule({
-    locateFile: (path) => '${minimalLibPath}/' + path,
+    locateFile: () => '${minimalLibPath}/RDKit_minimal.${packageVersion}.wasm',
 });
 const Depiction = {${Object.keys(Depiction).map(k => `${k}: ${Depiction[k]}`).join(',')}};
 

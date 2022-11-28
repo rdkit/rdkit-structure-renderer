@@ -45,17 +45,20 @@ const decodeNewline = s => s.replace(/&#10;/g, '\n');
 const encodeNewline = s => s.replace(/\n/g, '&#10;');
 
 /**
- * Return True if the passed string is a pkl_base64
+ * Return true if the passed string is a pkl_base64
  * @param {string} molText SMILES, CTAB or pkl_base64
- * @returns {boolean} True if pkl_base64
+ * @returns {boolean} true if pkl_base64
  */
 const isBase64Pickle = (molText) => molText.startsWith('pkl_');
 
 /**
- * Return true if molblock is an MDL molblock.
- * @returns {string} true if MDL molblock
+ * Return true if molText is an MDL molblock.
+ * @param {string} molText SMILES, CTAB or pkl_base64
+ * @returns {boolean} true if MDL molblock
  */
-const isMolBlock = molText => !isBase64Pickle(molText) && molText.includes('M  END');
+function isMolBlock(molText) {
+    return !this.isBase64Pickle(molText) && molText.includes('M  END');
+}
 
 /**
  * Return 'data-' prefixed attr.
@@ -217,6 +220,16 @@ const getViewPortRect = () => ({
     height: _getViewPortSizeAttr('Height'),
 });
 
+/**
+ * @param {string} scaffoldText scaffold description (SMILES, molblock or pkl_base64).
+ * The description may include multiple scaffolds, either separated by a pipe symbol
+ * ('|', SMILES and pkl_base64) or by the SDF terminator ('$$$$', molblock).
+ * @returns {Array<string>} array of scaffold descriptions
+ */
+function splitScaffoldText(scaffoldText) {
+    return scaffoldText.split(this.isMolBlock(scaffoldText) ? /\$\$\$\$\r?\n/ : '|');
+}
+
 export {
     decodeNewline,
     encodeNewline,
@@ -234,4 +247,5 @@ export {
     cssToText,
     getElementCenter,
     getViewPortRect,
+    splitScaffoldText,
 };

@@ -80,6 +80,7 @@ const USER_OPTS = {
     SCAFFOLD_NORMALIZE: null,
     SCAFFOLD_STRAIGHTEN: null,
     SCAFFOLD_CANONICALIZE: null,
+    USE_MOLBLOCK_WEDGING: null,
 };
 
 const NO_MATCH = '_noMatch';

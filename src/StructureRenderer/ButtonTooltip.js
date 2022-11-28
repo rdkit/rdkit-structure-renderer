@@ -39,12 +39,12 @@ import { getElementCenter, getViewPortRect } from "./utils.js";
 class ButtonTooltip {
     /**
      * Constructor.
-     * @param  {Renderer} renderer parent Renderer
-     * @param  {string} text tooltip text
+     * @param {Renderer} renderer parent Renderer
+     * @param {string} text tooltip text
      */
-     constructor(renderer, text) {
+    constructor(renderer, text) {
         this._renderer = renderer;
-        this._text = text;
+        this._text = text || null;
         this._isVisible = false;
         this._createTooltip();
     }
@@ -65,6 +65,7 @@ class ButtonTooltip {
         span.appendChild(content);
         div.appendChild(span);
         this._div = div;
+        this._content = content;
         this._span = span;
         this._setVisibleClass();
         document.body.appendChild(div);
@@ -100,12 +101,39 @@ class ButtonTooltip {
         return this._isVisible;
     }
 
+    /**
+     * Returns the Y offset for the tooltip position.
+     * @returns {Number} Y offset
+     */
     getYOffset() {
         const Y_TOOLTIP_OFFSET = 10;
         return Y_TOOLTIP_OFFSET;
     }
 
-    setPosition(parent) {
+    /**
+     * Returns the current tooltip text.
+     * @returns {string} tooltip text
+     */
+    getText() {
+        return this._text;
+    }
+
+    /**
+     * Sets the current tooltip text.
+     * If text is null, the tooltip will not show up.
+     * @param {string} text tooltip text
+     */
+    setText(text) {
+        this._text = text;
+        this._content.textContent = text;
+    }
+
+    /**
+     * Set the tooltip position relative to parent.
+     * @returns {boolean} true if success, false if failure
+     */
+    setPosition(parent, offset) {
+        offset = offset || { x: 0, y: 0 };
         const parentCenter = getElementCenter(parent);
         const viewPortRect = getViewPortRect();
         const height = this._height + this.getYOffset();
@@ -115,13 +143,13 @@ class ButtonTooltip {
         if (maxLeft < 0 || height > viewPortRect.height) {
             return false;
         }
-        let left = minLeft + parentCenter.x - this._halfWidth;
+        let left = minLeft + parentCenter.x - this._halfWidth + offset.x;
         if (left < minLeft) {
             left = minLeft;
         } else if (left > maxLeft) {
             left = maxLeft;
         }
-        let top = minTop + parentCenter.y - height;
+        let top = minTop + parentCenter.y - height + offset.y;
         if (top < minTop) {
             top += height + this.getYOffset();
         }
@@ -140,8 +168,11 @@ class ButtonTooltip {
      * Show the tooltip if possible (public).
      * @param {HTMLELement} parent element the tooltip belongs to
      */
-    show(parent) {
-        if (this.setPosition(parent)) {
+    show(parent, offset) {
+        if (this._text === null) {
+            return;
+        }
+        if (this.setPosition(parent, offset)) {
             this._setVisibleClass();
         }
     }

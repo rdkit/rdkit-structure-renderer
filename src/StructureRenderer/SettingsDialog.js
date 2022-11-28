@@ -31,6 +31,7 @@
 //
 
 import { RDK_STR_RNR } from './constants.js';
+import ButtonTooltip from './ButtonTooltip.js';
 import { getElementCenter, getViewPortRect } from './utils.js';
 
 /**
@@ -217,6 +218,22 @@ class SettingsDialog {
     }
 
     /**
+     * Called to show/hide the scaffold tooltip.
+     * @param {object} e event
+     */
+    showHideScaffoldTooltip(e) {
+        const { scaffoldTooltip } = this;
+        if (e.type === 'mouseleave' && scaffoldTooltip.isVisible()) {
+            scaffoldTooltip.hide();
+        } else if (e.type === 'mouseenter' && e.target && !scaffoldTooltip.isVisible()) {
+            scaffoldTooltip.show(e.target, {
+                x: -0.3 * e.target.getBoundingClientRect().width,
+                y: 0,
+            });
+        }
+    }
+
+    /**
      * Create the dialog (called by the constructor).
      */
     _createDialog() {
@@ -239,6 +256,15 @@ class SettingsDialog {
             checkbox.onclick = () => this.onRenderingChanged(tag);
             this.renderOpt[tag] = checkbox;
             label.appendChild(checkbox);
+            if (text.includes('scaffold')) {
+                label.onmouseenter = (e) => {
+                    this.showHideScaffoldTooltip(e);
+                }
+                label.onmouseleave = (e) => {
+                    this.showHideScaffoldTooltip(e);
+                }
+            }
+            this.scaffoldTooltip = new ButtonTooltip(this.renderer);
             ['box', 'mark'].forEach(className => {
                 const span = document.createElement('span');
                 span.className = className;
@@ -316,11 +342,19 @@ class SettingsDialog {
         // and if that has not failed to match before, or if drawOpts has a non-empty
         // "atoms" attribute
         const disableAndUncheck = (tag) => {
+            let text = null;
+            if (hasScaffold && failsMatch) {
+                text = 'Scaffold does not match';
+            } else if (!hasScaffold) {
+                text = 'No scaffold defined';
+            }
+            this.scaffoldTooltip.setText(text);
             const control = this.renderOpt[tag];
             control.checked = false;
             this.disableAction(control);
         };
         const enableAndMaybeCheck = (tag) => {
+            this.scaffoldTooltip.setText(null);
             const control = this.renderOpt[tag];
             if (control.hasAttribute('disabled')) {
                 const isChecked = this.renderer.getDivOpt(div, tag) || false;

@@ -636,7 +636,9 @@ const Renderer = {
      * Request mol pickle for a given divId.
      * @param {string} divId id of the div le molecule belongs to
      * @param {string} molText molecule description (SMILES, molblock or pkl_base64)
-     * @param {string} scaffoldText scaffold description (SMILES, molblock or pkl_base64)
+     * @param {string} scaffoldText scaffold description (SMILES, molblock or pkl_base64).
+     * Note that the description may include multiple scaffolds, either separated by
+     * a pipe symbol ('|', SMILES and pkl_base64) or by the SDF terminator ('$$$$', molblock).
      * @param {object} opts rendering options
      * @returns {Promise} a Promise that will resolve to an object
      * containing the mol pickle (and possibly other results depending on
@@ -764,8 +766,10 @@ const Renderer = {
     /**
      * Get scaffold description for a given div.
      * @param {Element} div
-     * @returns {string} scaffold description
-     * (SMILES, molblock or pkl_base64)
+     * @returns {string} scaffold description (SMILES, molblock or pkl_base64).
+     * Note that the description may include multiple scaffolds, either separated by
+     * a pipe symbol ('|', SMILES and pkl_base64) or by the SDF terminator
+     * ('$$$$', molblock)
      */
     getScaffold: function(div) {
         const attr = dataAttr(this.getDivAttrs().SCAFFOLD);
@@ -930,7 +934,9 @@ const Renderer = {
      * Request mol pickle for a given divId.
      * @param {string} divId id of the div le molecule belongs to
      * @param {string} molText molecule description (SMILES, molblock or pkl_base64)
-     * @param {string} scaffoldText scaffold description (SMILES, molblock or pkl_base64)
+     * @param {string} scaffoldText scaffold description (SMILES, molblock or pkl_base64).
+     * Note that the description may include multiple scaffolds, either separated by
+     * a pipe symbol ('|', SMILES and pkl_base64) or by the SDF terminator ('$$$$', molblock).
      * @param {object} opts rendering options
      * @returns {Promise} a Promise that will resolve to an object
      * containing the mol pickle (and possibly other results depending on
@@ -993,6 +999,14 @@ const Renderer = {
             const molDraw = this.getMolDraw(div);
             const userOpts = this.getUserOptsForDiv(div);
             const drawOpts = this.getDrawOpts(div);
+            if (typeof userOpts.USE_MOLBLOCK_WEDGING === 'undefined'
+                || userOpts.USE_MOLBLOCK_WEDGING) {
+                Object.assign(drawOpts, {
+                    useMolBlockWedging: true,
+                    wedgeBonds: false,
+                    addChiralHs: false,
+                });
+            }
             drawOpts.addAtomIndices = userOpts.ATOM_IDX;
             drawOpts.width = width;
             drawOpts.height = height;
@@ -1518,8 +1532,8 @@ const Renderer = {
             this._spinner = spinner;
         }
         const spinner = this._spinner.cloneNode(true);
-        const divHeight = div.getBoundingClientRect().height;
-        this.setSpinnerWhlRadius(spinner, divHeight)
+        const { height } = this.getRoundedDivSize(div);
+        this.setSpinnerWhlRadius(spinner, height)
         return spinner;
     },
 
@@ -1544,13 +1558,17 @@ const Renderer = {
      * associated to the passed div as rounded integers.
      * If the data-width and data-height attributes are not present or 0,
      * the current div rect width and height are returned.
+     * If also the current div rect width or height are zero, a default
+     * value will be used.
      * @param {Element} div
      * @returns {object} { width: integer, height: integer } dictionary
      */
     getRoundedDivSize: function(div) {
         const divRect = div.getBoundingClientRect();
-        const width = parseInt(div.getAttribute(dataAttr(this.getDivAttrs().WIDTH)) || '0') || Math.round(divRect.width);
-        const height = parseInt(div.getAttribute(dataAttr(this.getDivAttrs().HEIGHT)) || '0') || Math.round(divRect.height);
+        const width = parseInt(div.getAttribute(dataAttr(this.getDivAttrs().WIDTH)) || '0')
+            || Math.round(divRect.width) || DEFAULT_IMG_OPTS.width;
+        const height = parseInt(div.getAttribute(dataAttr(this.getDivAttrs().HEIGHT)) || '0')
+            || Math.round(divRect.height) || DEFAULT_IMG_OPTS.height;
         return { width, height };
     },
 
@@ -1775,7 +1793,7 @@ const Renderer = {
      * Returns true if the given key had to undergo coordinate
      * generation ahead of scaffold alignment (e.g., because
      * existing coordinates were corrupted or non-existing).
-     * @param {stringh} key cache key
+     * @param {string} key cache key
      * @returns {boolean} true if the given key had to undergo
      * coordinate generation ahead of alignment, false if not
      */
@@ -1929,6 +1947,12 @@ const Renderer = {
         }
         if (!molDraw) {
             div.appendChild(useSvg ? this.createSvgDiv(div) : this.createCanvas(div));
+            if (width && !div.style.width) {
+                div.style.width = `${width}px`;
+            }
+            if (height && !div.style.height) {
+                div.style.height = `${height}px`;
+            }
         }
         this.draw(div);
         if (this.settings?.isVisible && divId === this.settings.currentDivId) {

@@ -1,18 +1,23 @@
 import {
-    isBase64Pickle,
-    extractBase64Pickle,
-    getMolFromUInt8Array,
-    getPickleSafe
-} from './utils.js';
-
-const Depiction = {
-    isBase64Pickle,
     extractBase64Pickle,
     getMolFromUInt8Array,
     getPickleSafe,
+    isBase64Pickle,
+    isMolBlock,
+    splitScaffoldText,
+} from './utils.js';
+
+const Depiction = {
+    extractBase64Pickle,
+    getMolFromUInt8Array,
+    getPickleSafe,
+    isBase64Pickle,
+    isMolBlock,
+    splitScaffoldText,
 
     /**
      * Generate molecule from SMILES, CTAB or pkl_base64.
+     * @param {object}
      * @param {string} molText SMILES, CTAB or pkl_base64
      * @returns {JSMol} molecule or null in case of failure
      */
@@ -56,6 +61,46 @@ const Depiction = {
             return mol;
         }
         return _getMolSafe();
+    },
+
+    /**
+     * Generate JSMolIterator from a JSMol potentially
+     * containing multiple disconnected fragments.
+     * @param {JSMol} mol RDKit JSMol
+     * @returns {JSMolIterator} molecule iterator or null in case of failure
+     */
+     getFragsSafe: function(mol, get_frags_opts) {
+        const FALLBACK_OPS = ['sanitizeFrags'];
+        // this is called recursively until success
+        // or until FALLBACK_OPS are available
+        const _getFragsSafe = opIdx => {
+            let exc = '';
+            let molIterator = null;
+            let opts = get_frags_opts || {};
+            let op;
+            if (typeof opIdx === 'number') {
+                op = FALLBACK_OPS[opIdx];
+                opts[op] = false;
+            } else {
+                opIdx = -1;
+            }
+            try {
+                molIterator = mol.get_frags(JSON.stringify(opts));
+            } catch(e) {
+                exc = ` (${e})`;
+            }
+            if (!molIterator) {
+                if (++opIdx < FALLBACK_OPS.length) {
+                    return _getFragsSafe(opIdx);
+                } else {
+                    console.error(`Failed to get frags from RDKit mol${exc}`);
+                }
+            } else if (op) {
+                console.error(`Failed to run ${op}`);
+            }
+            return molIterator;
+        }
+        return _getFragsSafe();
     },
 
     /**
@@ -186,11 +231,13 @@ const Depiction = {
                     MOL_CANONICALIZE: rebuild || opts.RECOMPUTE2D,
                     MOL_STRAIGHTEN: true,
                     ALIGN_REBUILD: opts.RECOMPUTE2D,
+                    USE_MOLBLOCK_WEDGING: !(rebuild || opts.RECOMPUTE2D),
                 });
                 const normalize = behavior.MOL_NORMALIZE;
                 let straighten = behavior.MOL_STRAIGHTEN;
                 let canonicalize = (behavior.MOL_CANONICALIZE ? canonicalizeDir : 0);
                 let alignRebuild = behavior.ALIGN_REBUILD;
+                let useMolblockWedging = behavior.USE_MOLBLOCK_WEDGING;
                 switch (type) {
                     case 'c': {
                         rebuild = true;
@@ -205,54 +252,73 @@ const Depiction = {
                             SCAFFOLD_CANONICALIZE: false,
                             SCAFFOLD_STRAIGHTEN: true,
                         });
-                        let straightenScaffold = behavior.SCAFFOLD_STRAIGHTEN;
-                        let normalizeScaffold = behavior.SCAFFOLD_NORMALIZE;
-                        let canonicalizeScaffold = (behavior.SCAFFOLD_CANONICALIZE ? canonicalizeDir : 0);
-                        let minimizeScaffoldRotation = !behavior.SCAFFOLD_CANONICALIZE;
-                        match = {};
-                        let scaffold = this.getMolSafe(rdkitModule, scaffoldText, { removeHs: false, mergeQueryHs: true });
-                        if (!scaffold) {
-                            console.error(`Failed to generate RDKit scaffold`);
-                        } else if (!scaffold.has_coords()) {
-                            if (isBehaviorAuto.SCAFFOLD_NORMALIZE) {
-                                normalizeScaffold = true;
-                            }
-                            if (isBehaviorAuto.SCAFFOLD_CANONICALIZE) {
-                                canonicalizeScaffold = canonicalizeDir;
-                            }
-                            if (isBehaviorAuto.SCAFFOLD_STRAIGHTEN) {
-                                straightenScaffold = true;
-                                minimizeScaffoldRotation = false;
-                            }
-                            const hasCoords = this.setNewCoords(scaffold, true);
-                            if (!hasCoords) {
-                                scaffold.delete();
-                                scaffold = null;
-                                match = null;
+                        if (normalize && mol.normalize_depiction(0) < 0.) {
+                            rebuild = true;
+                            if (isBehaviorAuto.ALIGN_REBUILD) {
+                                alignRebuild = true;
                             }
                         }
-                        if (scaffold) {
-                            if (scaffold.is_valid()) {
+                        const canonicalizeScaffoldStored = (behavior.SCAFFOLD_CANONICALIZE ? canonicalizeDir : 0);
+                        match = null;
+                        const scaffoldTextArray = this.splitScaffoldText(scaffoldText);
+                        const scaffoldIteratorArray = [];
+                        scaffoldTextArray.every(maybeMultiScaffoldText => {
+                            let scaffold = this.getMolSafe(rdkitModule,
+                                maybeMultiScaffoldText, { removeHs: false, mergeQueryHs: true });
+                            if (scaffold && !scaffold.is_valid()) {
+                                scaffold.delete();
+                                scaffold = null;
+                            }
+                            if (!scaffold) {
+                                console.error(`Failed to generate RDKit scaffold`);
+                                return true;
+                            }
+                            const { molIterator } = this.getFragsSafe(scaffold);
+                            if (molIterator) {
+                                scaffoldIteratorArray.push(molIterator);
+                            }
+                            return true;
+                        });
+                        scaffoldIteratorArray.every(scaffoldIterator => {
+                            while (!match && !scaffoldIterator.at_end()) {
+                                const scaffold = scaffoldIterator.next();
+                                if (!scaffold) {
+                                    break;
+                                }
+                                if (!scaffold.is_valid()) {
+                                    scaffold.delete();
+                                    continue;
+                                }
+                                let straightenScaffold = behavior.SCAFFOLD_STRAIGHTEN;
+                                let normalizeScaffold = behavior.SCAFFOLD_NORMALIZE;
+                                let canonicalizeScaffold = canonicalizeScaffoldStored;
+                                let minimizeScaffoldRotation = !behavior.SCAFFOLD_CANONICALIZE;
+                                if (!scaffold.has_coords()) {
+                                    if (isBehaviorAuto.SCAFFOLD_NORMALIZE) {
+                                        normalizeScaffold = true;
+                                    }
+                                    if (isBehaviorAuto.SCAFFOLD_CANONICALIZE) {
+                                        canonicalizeScaffold = canonicalizeDir;
+                                    }
+                                    if (isBehaviorAuto.SCAFFOLD_STRAIGHTEN) {
+                                        straightenScaffold = true;
+                                        minimizeScaffoldRotation = false;
+                                    }
+                                    const hasCoords = this.setNewCoords(scaffold, true);
+                                    if (!hasCoords) {
+                                        scaffold.delete();
+                                        continue;
+                                    }
+                                }
                                 if (normalizeScaffold && scaffold.normalize_depiction(canonicalizeScaffold) < 0.) {
                                     console.error(`Scaffold has bad coordinates - ignoring it`);
                                     scaffold.delete();
-                                    scaffold = null;
-                                    match = null;
+                                    continue;
                                 }
-                            }
-                        }
-                        if (scaffold) {
-                            if (scaffold.is_valid()) {
                                 if (straightenScaffold) {
                                     scaffold.straighten_depiction(minimizeScaffoldRotation);
                                 }
                                 try {
-                                    if (normalize && mol.normalize_depiction(0) < 0.) {
-                                        rebuild = true;
-                                        if (isBehaviorAuto.ALIGN_REBUILD) {
-                                            alignRebuild = true;
-                                        }
-                                    }
                                     match = JSON.parse(mol.generate_aligned_coords(scaffold, JSON.stringify({
                                         useCoordGen: true,
                                         allowRGroups: true,
@@ -261,7 +327,6 @@ const Depiction = {
                                     })) || null);
                                 } catch(e) {
                                     console.error(`Exception in generate_aligned_coords (${e})`);
-                                    match = null;
                                 }
                                 if (match) {
                                     if (abbreviate) {
@@ -281,15 +346,19 @@ const Depiction = {
                                         }
                                     }
                                 }
+                                scaffold.delete();
                             }
-                            scaffold.delete();
-                        }
+                            scaffoldIterator.delete();
+                            return (match === null);
+                        });
                         const rebuildStored = rebuild;
                         if (match) {
+                            useMolblockWedging = false;
                             rebuild = false;
                             straighten = false;
                             canonicalize = 0;
                         } else if (opts.RECOMPUTE2D) {
+                            useMolblockWedging = false;
                             rebuild = true;
                         }
                         Object.assign(res, this.getNormPickle(mol, { rebuild, useCoordGen, normalize, canonicalize, straighten }));
@@ -305,6 +374,13 @@ const Depiction = {
                     case 's': {
                         if (abbreviate) {
                             mol.condense_abbreviations();
+                        }
+                        if (useMolblockWedging) {
+                            Object.assign(drawOpts, {
+                                useMolBlockWedging: true,
+                                wedgeBonds: false,
+                                addChiralHs: false,
+                            });
                         }
                         [0, 1].some(() => {
                             const drawOptsText = JSON.stringify(drawOpts);

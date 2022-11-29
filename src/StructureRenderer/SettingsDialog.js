@@ -410,7 +410,9 @@ class SettingsDialog {
                 this.buttons[type] = button;
             }
         });
-        const formats = await this.renderer.getChemFormatsFromPickle(this.renderer.getCurrentMol(key).pickle);
+        const userOpts = this.renderer.getUserOptsForDiv(div);
+        const formats = await this.renderer.getChemFormatsFromPickle(
+            this.renderer.getCurrentMol(key).pickle, null, userOpts.USE_MOLBLOCK_WEDGING);
         Object.entries(formats).forEach(([format, value]) => this.textArea[format].value = value);
     }
 

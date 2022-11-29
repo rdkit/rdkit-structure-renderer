@@ -104,10 +104,10 @@ const camelCaseToDash = k => k.replace(/[A-Z]/g, m => '-' + m[0].toLowerCase());
  * @param {JSMol} mol
  * @returns {string} molblock or '' in case of failure
  */
-const getMolblockFromMol = mol => {
+const getMolblockFromMol = (mol, details) => {
     let molblock = null;
     try {
-        molblock = mol.get_molblock();
+        molblock = mol.get_molblock(details || '{}');
     } catch {
         // we handle this below
     }

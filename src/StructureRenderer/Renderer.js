@@ -1051,7 +1051,8 @@ const Renderer = {
                     if (mol) {
                         try {
                             if (returnMolBlock) {
-                                molblock = getMolblockFromMol(mol);
+                                const molBlockParams = this.getMolblockParams(userOpts.USE_MOLBLOCK_WEDGING);
+                                molblock = getMolblockFromMol(mol, molBlockParams);
                             }
                             if (!useSvg) {
                                 if (userOpts.ABBREVIATE) {
@@ -1123,15 +1124,18 @@ const Renderer = {
      * @param {UInt8Array} pickle
      * @param {Array} formats optional, array with formats that
      * should be retrieved ('molblock', 'smiles', 'inchi')
+     * @param {boolean} useMolBlockWedging whether the molblock should
+     * be generated using original CTAB wedging information
      * @returns {object} dictionary with chemical representations
      */
-    getChemFormatsFromPickle: async function(pickle, formats) {
+    getChemFormatsFromPickle: async function(pickle, formats, useMolBlockWedging) {
         formats = formats || ['molblock', 'smiles', 'inchi'];
+        const molBlockParams = this.getMolblockParams(useMolBlockWedging);
         const res = Object.fromEntries(formats.map(k => [k, '']));
         const mol = await this.getMolFromPickle(pickle);
         if (mol) {
             if (res.molblock === '') {
-                res.molblock = getMolblockFromMol(mol);
+                res.molblock = getMolblockFromMol(mol, molBlockParams);
             }
             if (res.smiles === '') {
                 try {
@@ -1349,6 +1353,19 @@ const Renderer = {
     },
 
     /**
+     * Generate appropriate JSON parameters for get_molblock()
+     * based on the value of the useMolBlockWedging parameter.
+     * @param {string|boolean} useMolBlockWedging can be a boolean or 'a'
+     * @returns {string} get_molblock parameters as JSON string
+     */
+    getMolblockParams: function(useMolBlockWedging) {
+        useMolBlockWedging = (typeof useMolBlockWedging === 'boolean'
+            ? useMolBlockWedging : true);
+        const addChiralHs = !useMolBlockWedging;
+        return JSON.stringify({ useMolBlockWedging, addChiralHs });
+    },
+
+    /**
      * Put some content from a given div on the clipboard.
      * @param {Element} div
      * @param {Array<String>} formats array of formats
@@ -1371,7 +1388,8 @@ const Renderer = {
                 const content = {};
                 if (formats.includes('molblock')) {
                     const type = 'text/plain';
-                    const molblock = getMolblockFromMol(mol);
+                    const molBlockParams = this.getMolblockParams(userOpts.USE_MOLBLOCK_WEDGING);
+                    const molblock = getMolblockFromMol(mol, molBlockParams);
                     content[type] = new Blob([molblock], { type });
                 }
                 if (hasPng || hasSvg) {

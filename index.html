@@ -1184,6 +1184,8 @@
         </table>
         <script type="module">
             import Renderer from "/src/index.js";
+            // Uncomment the following to prevent spawning any Web Workers
+            // Renderer.getMaxConcurrency = () => 0;
             Renderer.init(`${window.location}/public/RDKit_minimal.js`).then(r => r.updateMolDrawDivs());
         </script>
     </body>

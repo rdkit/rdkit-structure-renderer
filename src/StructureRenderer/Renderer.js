@@ -34,6 +34,8 @@ import defaultRendererCss from './style.js';
 import defaultDialogHtml from './dialog.js';
 import defaultIcons from './icons.js';
 import Scheduler from './Scheduler.js';
+import Dispatcher from './Dispatcher.js';
+import LocalDispatcher from './LocalDispatcher.js';
 import SettingsDialog from './SettingsDialog.js';
 import ButtonTooltip from './ButtonTooltip.js';
 import {
@@ -62,13 +64,18 @@ import { version as packageVersion } from '../version.js';
 
 
 var _RDKitModule;
+const haveWindow = (typeof window !== 'undefined');
+const _window = (haveWindow ? window : {
+    devicePixelRatio: 1,
+});
 
 const Renderer = {
     /**
      * Override to change, currently hardware concurrency minus 2.
      * @returns {number} Hardware concurrency
      */
-    getHardwareConcurrency: () => Math.max((navigator.hardwareConcurrency || 1) - 2, 1),
+    getHardwareConcurrency: () => Math.max(((typeof navigator !== 'undefined'
+        && navigator.hardwareConcurrency) || 1) - 2, 1),
 
     /**
      * Override to change, currently capped to 8.
@@ -381,6 +388,27 @@ const Renderer = {
             }
             this._minimalLibPath = minimalLibPath.substring(0, minimalLibPath.lastIndexOf('/'));
             this._minimalLibJs = `${this._minimalLibPath}/RDKit_minimal.${packageVersion}.js`;
+            if (!haveWindow) {
+                const modulePaths = ['', ...module.paths];
+                if (!modulePaths.some(path => {
+                    try {
+                        minimalLibPath = (path ? path + '/' : path) + this._minimalLibJs;
+                        // Using backticks avoids the following webpack warning:
+                        // 'Critical dependency: the request of a dependency is an expression'
+                        _window.initRDKitModule = require(`${minimalLibPath}`);
+                    } catch(e) {
+                        if (e.code !== 'MODULE_NOT_FOUND') {
+                            throw e;
+                        }
+                        return false;
+                    }
+                    this._minimalLibPath = minimalLibPath.substring(0, minimalLibPath.lastIndexOf('/'));
+                    this._minimalLibJs = minimalLibPath;
+                    return true;
+                })) {
+                    throw Error(`Failed to find module ${this._minimalLibJs}`);
+                }
+            }
             // create the Scheduler (which in turn may spawn WebWorkers)
             // if it has not been created yet
             this.scheduler();
@@ -392,7 +420,7 @@ const Renderer = {
             if (typeof _RDKitModule === 'undefined') {
                 console.log(`rdkit-structure-renderer version: ${packageVersion}`);
                 _RDKitModule = null;
-                if (!document.getElementById(RDK_LOADER_ID)) {
+                if (haveWindow && !document.getElementById(RDK_LOADER_ID)) {
                     const rdkitLoaderScript = document.createElement('script');
                     rdkitLoaderScript.id = RDK_LOADER_ID;
                     rdkitLoaderScript.src = this._minimalLibJs;
@@ -401,13 +429,13 @@ const Renderer = {
                     document.head.appendChild(rdkitLoaderScript);
                 }
             }
-            if (window.initRDKitModule || _RDKitModule) {
+            if (_window.initRDKitModule || _RDKitModule) {
                 let res = this;
                 if (!_RDKitModule) {
-                    if (typeof initRDKitModule !== 'function') {
+                    if (typeof _window.initRDKitModule !== 'function') {
                         throw Error('_loadRDKitModule: initRDKitModule is not a function');
                     }
-                    _RDKitModule = window.initRDKitModule({
+                    _RDKitModule = _window.initRDKitModule({
                         locateFile: () => `${this._minimalLibPath}/RDKit_minimal.${packageVersion}.wasm`
                     });
                     res = (async () => {
@@ -415,11 +443,11 @@ const Renderer = {
                         if (!this.isRDKitReady()) {
                             throw Error(`_loadRDKitModule: Failed to bootstrap ${this._minimalLibJs}`);
                         }
-                        window.initRDKitModule = undefined;
+                        _window.initRDKitModule = undefined;
                         // uncomment to have the RDKitModule available in console for debugging
-                        // window.RDKitModule = _RDKitModule;
+                        // _window.RDKitModule = _RDKitModule;
                         // uncomment to have the Renderer available in console for debugging
-                        window.RDKitStructureRenderer = this;
+                        _window.RDKitStructureRenderer = this;
                         console.log('RDKit version: ' + _RDKitModule.version());
                         return this;
                     })();
@@ -604,10 +632,12 @@ const Renderer = {
                     delete currentDiv.childQueue;
                 }
             };
+            const concurrency = this.getConcurrency();
+            const getDispatchers = concurrency
+                ? () => [...Array(concurrency).keys()].map(i => new Dispatcher(i, this.getMinimalLibPath()))
+                : () => [new LocalDispatcher(0, this.getRDKitModule())];
             this._scheduler = new Scheduler({
-                minimalLibPath: this.getMinimalLibPath(),
-                concurrency: this.getConcurrency(),
-                dispatchers: this.getDispatchers(),
+                getDispatchers,
                 cleanupFunc
             });
         }
@@ -1284,7 +1314,7 @@ const Renderer = {
      * - match: match object, defaults to the current div match
      * - userOpts: user settings, defaults to the current div settings
      * - drawOpts: RDKit drawOpts, defaults to the current div drawOpts
-     * @returns {string|Blob} a string if format is either 'svg' or 'base64',
+     * @returns {string|Blob} a string if format is either 'svg' or 'base64png',
      * otherwise a Blob
      */
     getImageFromMol: async function(mol, opts) {
@@ -1334,7 +1364,7 @@ const Renderer = {
             } catch(e) {
                 console.error(`Failed to generate SVG image (${e})`);
             }
-        } else {
+        } else if (haveWindow) {
             const canvas = document.createElement('canvas');
             this.resizeMolDraw(canvas, drawOpts.width, drawOpts.height, 1);
             try {
@@ -1348,6 +1378,8 @@ const Renderer = {
             } catch(e) {
                 console.error(`Failed to draw to canvas (${e})`);
             }
+        } else {
+            console.error("Canvas is not available on this platform");
         }
         return image;
     },
@@ -1596,7 +1628,7 @@ const Renderer = {
      * @returns {object} { width: integer, height: integer } dictionary
      */
     resizeMolDraw: function(molDraw, width, height, scaleFac) {
-        const scale = scaleFac || window.devicePixelRatio;
+        const scale = scaleFac || _window.devicePixelRatio;
         if (!(width > 0 && height > 0)) {
             return;
         }

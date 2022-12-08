@@ -47,7 +47,7 @@ class Dispatcher {
      * @param {number} id worker id
      * @returns the code to be executed by the worker
      */
-     getWorkerBlob(minimalLibPath) {
+    _getWorkerBlob(minimalLibPath) {
         return [
 `importScripts('${minimalLibPath}/RDKit_minimal.${packageVersion}.js');
 const rdkitReady = initRDKitModule({
@@ -82,7 +82,7 @@ main(rdkitReady, ${this.id});`
             throw Error("Workers are not supported");
         }
         return new Promise(resolve => {
-            const blob = new Blob(this.getWorkerBlob(minimalLibPath));
+            const blob = new Blob(this._getWorkerBlob(minimalLibPath));
             const url = window.URL || window.webkitURL;
             const blobUrl = url.createObjectURL(blob);
             resolve(new Worker(blobUrl));

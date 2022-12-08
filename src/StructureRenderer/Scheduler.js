@@ -30,17 +30,15 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-import Dispatcher from './Dispatcher.js';
 import { MainQueue } from './Queue.js';
 
 
 class Scheduler {
-    constructor({ minimalLibPath, concurrency, dispatchers, cleanupFunc }) {
+    constructor({ getDispatchers, cleanupFunc }) {
         this.mainQueue = new MainQueue(this, cleanupFunc);
         this._token = 0;
         this._dispatcherMap = new Map();
-        this._dispatchers = (Array.isArray(dispatchers) ? dispatchers :
-            [...Array(concurrency).keys()].map(i => new Dispatcher(i, minimalLibPath)));
+        this._dispatchers = getDispatchers();
     }
 
     /**

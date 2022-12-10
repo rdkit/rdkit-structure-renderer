@@ -39,6 +39,7 @@ import LocalDispatcher from './LocalDispatcher.js';
 import SettingsDialog from './SettingsDialog.js';
 import ButtonTooltip from './ButtonTooltip.js';
 import {
+    getMinimalLibBasename,
     cssToText,
     decodeNewline,
     dataAttr,
@@ -68,6 +69,18 @@ const haveWindow = (typeof window !== 'undefined');
 const _window = (haveWindow ? window : {
     devicePixelRatio: 1,
 });
+const haveWebAssembly = (() => {
+    try {
+        if (typeof WebAssembly === "object"
+            && typeof WebAssembly.instantiate === "function") {
+            const module = new WebAssembly.Module(Uint8Array.of(0x0, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00));
+            if (module instanceof WebAssembly.Module)
+                return new WebAssembly.Instance(module) instanceof WebAssembly.Instance;
+        }
+    } catch (e) {
+    }
+    return false;
+})();
 
 const Renderer = {
     /**
@@ -81,7 +94,7 @@ const Renderer = {
      * Override to change, currently capped to 8.
      * @returns {number} Maximum allowed concurrency independently of hardware
      */
-    getMaxConcurrency: () => 8,
+    getMaxConcurrency: () => haveWebAssembly ? 8 : 0,
 
     /**
      * Override for custom HTML.
@@ -374,20 +387,30 @@ const Renderer = {
      * into the current HTML document. If the URL of the MinimalLib
      * JS loader, MinimalLib will be loaded from there, otherwise
      * it will be loaded from the default location.
-     * @param {string} minimalLibPath optional URL containing RDKit_minimal.js
+     * @param {string} minimalLibPath (optional) URL containing RDKit_minimal
+     * @param {string} basename (optional) basename of the main library
      * @returns {Promise} Promise that resolves to the RDKit module
      * once the latter is loaded and initialized
      */
-    init: function(minimalLibPath) {
+    init: function(minimalLibPath, basename) {
+        if (!basename) {
+            basename = getMinimalLibBasename();
+            if (!haveWebAssembly) {
+                basename += "_plainJs";
+            }
+        }
         if (this.isRDKitReady()) {
             return Promise.resolve(this);
         }
         if (!this._minimalLibJs) {
             if (typeof minimalLibPath !== 'string') {
                 minimalLibPath = document.currentScript?.src || '';
+                minimalLibPath = minimalLibPath.substring(0, minimalLibPath.lastIndexOf('/'));
+            } else if (minimalLibPath.length && minimalLibPath[minimalLibPath.length - 1] === '/') {
+                minimalLibPath = minimalLibPath.substring(0, minimalLibPath.length - 1);
             }
-            this._minimalLibPath = minimalLibPath.substring(0, minimalLibPath.lastIndexOf('/'));
-            this._minimalLibJs = `${this._minimalLibPath}/RDKit_minimal.${packageVersion}.js`;
+            this._minimalLibPath = minimalLibPath;
+            this._minimalLibJs = `${this._minimalLibPath}/${basename}.${packageVersion}.js`;
             if (!haveWindow) {
                 const modulePaths = ['', ...module.paths];
                 if (!modulePaths.some(path => {
@@ -436,7 +459,7 @@ const Renderer = {
                         throw Error('_loadRDKitModule: initRDKitModule is not a function');
                     }
                     _RDKitModule = _window.initRDKitModule({
-                        locateFile: () => `${this._minimalLibPath}/RDKit_minimal.${packageVersion}.wasm`
+                        locateFile: () => `${this._minimalLibPath}/${basename}.${packageVersion}.wasm`
                     });
                     res = (async () => {
                         _RDKitModule = await _RDKitModule;

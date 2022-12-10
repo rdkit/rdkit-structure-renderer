@@ -1184,9 +1184,12 @@
         </table>
         <script type="module">
             import Renderer from "/src/index.js";
+            let basename;
             // Uncomment the following to prevent spawning any Web Workers
             // Renderer.getMaxConcurrency = () => 0;
-            Renderer.init(`${window.location}/public/RDKit_minimal.js`).then(r => r.updateMolDrawDivs());
+            // Uncomment the following to force using the asm.js version of RDKit_minimal
+            // basename = 'RDKit_minimal_plainJs';
+            Renderer.init(`${window.location}/public`, basename).then(r => r.updateMolDrawDivs());
         </script>
     </body>
 </html>

@@ -41,6 +41,7 @@ module.exports = () => {
         },
         output: {
             path: path.resolve(__dirname, "dist"),
+            publicPath: '',
             filename: 'rdkit-structure-renderer-module.js',
             library: {
                 type: 'module',
@@ -57,6 +58,7 @@ module.exports = () => {
         },
         output: {
             path: path.resolve(__dirname, "dist"),
+            publicPath: '',
             filename: 'rdkit-structure-renderer-bundle.js',
         },
         devServer: {

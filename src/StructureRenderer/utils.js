@@ -31,6 +31,12 @@
 //
 
 /**
+ * Return the MinimalLib basename
+ * @returns {string} MinimalLib basename
+ */
+const getMinimalLibBasename = () => `RDKit_minimal`;
+
+/**
  * Replace &#10; with CR.
  * @param {string} s input string
  * @returns {string} string with &#10; replaced by CR
@@ -231,6 +237,7 @@ function splitScaffoldText(scaffoldText) {
 }
 
 export {
+    getMinimalLibBasename,
     decodeNewline,
     encodeNewline,
     isBase64Pickle,

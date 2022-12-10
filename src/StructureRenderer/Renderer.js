@@ -69,6 +69,7 @@ const haveWindow = (typeof window !== 'undefined');
 const _window = (haveWindow ? window : {
     devicePixelRatio: 1,
 });
+const haveWorker = (typeof Worker !== 'undefined');
 const haveWebAssembly = (() => {
     try {
         if (typeof WebAssembly === "object"
@@ -94,7 +95,7 @@ const Renderer = {
      * Override to change, currently capped to 8.
      * @returns {number} Maximum allowed concurrency independently of hardware
      */
-    getMaxConcurrency: () => haveWebAssembly ? 8 : 0,
+    getMaxConcurrency: () => haveWebAssembly && haveWorker ? 8 : 0,
 
     /**
      * Override for custom HTML.

@@ -79,7 +79,7 @@ main(rdkitReady, ${this.id});`
      * @returns {Worker} the created WebWorker
      */
     _createWorker(minimalLibPath) {
-        if (!window.Worker) {
+        if (typeof Worker === 'undefined') {
             throw Error("Workers are not supported");
         }
         return new Promise(resolve => {

@@ -50,7 +50,8 @@ const Depiction = {
                     mol.delete();
                     mol = null;
                 }
-                if (++opIdx < FALLBACK_OPS.length) {
+                while (++opIdx < FALLBACK_OPS.length && opts[FALLBACK_OPS[opIdx]]);
+                if (opIdx < FALLBACK_OPS.length) {
                     return _getMolSafe(opIdx);
                 } else {
                     console.error(`Failed to generate RDKit mol${exc}`);

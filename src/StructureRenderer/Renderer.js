@@ -79,6 +79,7 @@ const haveWebAssembly = (() => {
                 return new WebAssembly.Instance(module) instanceof WebAssembly.Instance;
         }
     } catch (e) {
+        // no-op
     }
     return false;
 })();

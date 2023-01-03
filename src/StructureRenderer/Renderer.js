@@ -1588,7 +1588,7 @@ const Renderer = {
         }
         const style = `${marginTop}${marginLeft}width: ${whlRadius}px; ` +
             `height: ${whlRadius}px; border-width: ${this.getWhlOpts().WIDTH}px`
-        spinner.firstChild.style = style;
+        spinner.firstChild.setAttribute('style', style);
     },
 
     /**

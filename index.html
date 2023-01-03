@@ -1182,14 +1182,25 @@
                 </tr>
             </tbody>
         </table>
+        <!-- Uncomment to load as module
         <script type="module">
-            import Renderer from "/src/index.js";
+            import Renderer from "/dist/rdkit-structure-renderer-module.js";
             let basename;
             // Uncomment the following to prevent spawning any Web Workers
             // Renderer.getMaxConcurrency = () => 0;
             // Uncomment the following to force using the asm.js version of RDKit_minimal
             // basename = 'RDKit_minimal_plainJs';
             Renderer.init(`${window.location}/public`, basename).then(r => r.updateMolDrawDivs());
+        </script>
+        -->
+        <script src="/dist/rdkit-structure-renderer-bundle.js"></script>
+        <script>
+            let basename;
+            // Uncomment the following to prevent spawning any Web Workers
+            // window.RDKitStructureRenderer.getMaxConcurrency = () => 0;
+            // Uncomment the following to force using the asm.js version of RDKit_minimal
+            // basename = 'RDKit_minimal_plainJs';
+            window.RDKitStructureRenderer.init(window.location + '/public', basename).then(function(r) { r.updateMolDrawDivs() });
         </script>
     </body>
 </html>

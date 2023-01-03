@@ -6,16 +6,19 @@ const HtmlWebpackPlugin = require("html-webpack-plugin");
 const isProduction = process.env.NODE_ENV == "production";
 
 const config = {
-    entry: "./pkg/dist-src/index.js",
     module: {
         rules: [
             {
                 test: /\.m?js$/,
-                exclude: /node_modules/,
+                exclude: [
+                    /node_modules/,
+                    /\bcore-js\b/
+                ],
                 use: {
-                    loader: 'babel-loader',
+                    loader: "babel-loader",
                     options: {
-                        presets: ['@babel/preset-env']
+                        configFile: path.resolve(__dirname, "babel.config.js"),
+                        presets: ["@babel/preset-env"]
                     }
                 }
             },
@@ -36,37 +39,45 @@ module.exports = () => {
 
     const moduleConfig = {
         ...config,
+        entry: {
+            app: [
+                "core-js/stable/string/trim-end",
+                "./pkg/dist-src/index.js"
+            ]
+        },
         experiments: {
             outputModule: true,
         },
         output: {
             path: path.resolve(__dirname, "dist"),
-            publicPath: '',
-            filename: 'rdkit-structure-renderer-module.js',
+            publicPath: "",
+            filename: "rdkit-structure-renderer-module.js",
             library: {
-                type: 'module',
+                type: "module",
             },
         },
     };
 
     const scriptConfig = {
         ...config,
-        resolve: {
-            alias: {
-                './StructureRenderer/Renderer': '/src/StructureRenderer/Renderer',
-            },
+        entry: {
+            app: [
+                "core-js/stable",
+                "./pkg/dist-src/bundle.js"
+            ]
         },
+        target: ["web", "es5"],
         output: {
             path: path.resolve(__dirname, "dist"),
-            publicPath: '',
-            filename: 'rdkit-structure-renderer-bundle.js',
+            publicPath: "",
+            filename: "rdkit-structure-renderer-bundle.js",
         },
         devServer: {
             static: {
                 directory: path.resolve(__dirname),
             },
             open: true,
-            server: 'https',
+            server: "https",
             host: "localhost",
             port: 7800,
         },

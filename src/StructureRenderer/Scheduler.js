@@ -30,8 +30,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-import { MainQueue } from './Queue.js';
-
+import MainQueue from './MainQueue.js';
 
 class Scheduler {
     constructor({ getDispatchers, cleanupFunc }) {
@@ -49,7 +48,7 @@ class Scheduler {
      */
     get() {
         let token = null;
-        const freeDispatchers = this._dispatchers.filter(w => !w.isAllocated());
+        const freeDispatchers = this._dispatchers.filter((w) => !w.isAllocated());
         if (freeDispatchers.length) {
             token = this._token;
             const freeDispatcher = freeDispatchers[0];
@@ -85,7 +84,7 @@ class Scheduler {
      * when the job is completed
      */
     submit(msg, token) {
-        return new Promise(resolve => {
+        return new Promise((resolve) => {
             const dispatcher = this.dispatcher(token);
             const msgChannel = new MessageChannel();
             msg.wPort = msgChannel.port2;
@@ -94,7 +93,7 @@ class Scheduler {
                 dispatcher.setIsAllocated(false);
                 dispatcher.setIsBusy(false);
                 // flush child queues first
-                const hasTokens = this.mainQueue.children().every(child => child.flush());
+                const hasTokens = this.mainQueue.children().every((child) => child.flush());
                 this.mainQueue.removeEmptyChildren();
                 // if there are still tokens, flush the main queue
                 if (hasTokens) {

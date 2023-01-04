@@ -63,20 +63,23 @@ import {
 } from './constants.js';
 import { version as packageVersion } from '../version.js';
 
-
-var _RDKitModule;
+let _RDKitModule;
 const haveWindow = (typeof window !== 'undefined');
 const _window = (haveWindow ? window : {
     devicePixelRatio: 1,
 });
 const haveWorker = (typeof Worker !== 'undefined');
+const isIE11 = (!window.ActiveXObject && 'ActiveXObject' in window);
 const haveWebAssembly = (() => {
     try {
-        if (typeof WebAssembly === "object"
-            && typeof WebAssembly.instantiate === "function") {
-            const module = new WebAssembly.Module(Uint8Array.of(0x0, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00));
-            if (module instanceof WebAssembly.Module)
+        if (typeof WebAssembly === 'object'
+            && typeof WebAssembly.instantiate === 'function') {
+            const module = new WebAssembly.Module(
+                Uint8Array.of(0x0, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00)
+            );
+            if (module instanceof WebAssembly.Module) {
                 return new WebAssembly.Instance(module) instanceof WebAssembly.Instance;
+            }
         }
     } catch (e) {
         // no-op
@@ -96,7 +99,7 @@ const Renderer = {
      * Override to change, currently capped to 8.
      * @returns {number} Maximum allowed concurrency independently of hardware
      */
-    getMaxConcurrency: () => haveWebAssembly && haveWorker ? 8 : 0,
+    getMaxConcurrency: () => (haveWebAssembly && haveWorker ? 8 : 0),
 
     /**
      * Override for custom HTML.
@@ -111,14 +114,14 @@ const Renderer = {
      */
     getDispatchers: () => null,
 
-     /**
-      * Override to use an existing RDKitModule.
-      * @returns {Promise} promise that resolves to RDKitModule
-      */
-    getRDKitModule: async function() {
-         await this.init();
-         return _RDKitModule;
-     },
+    /**
+     * Override to use an existing RDKitModule.
+     * @returns {Promise} promise that resolves to RDKitModule
+     */
+    async getRDKitModule() {
+        await this.init();
+        return _RDKitModule;
+    },
 
     /**
      * Override to use custom default drawing options.
@@ -130,7 +133,7 @@ const Renderer = {
      * Return default drawing option k.
      * @returns {object} default drawing option k
      */
-    getDefaultDrawOpt: function(k) {
+    getDefaultDrawOpt(k) {
         return this.getDefaultDrawOpts()[k];
     },
 
@@ -151,15 +154,16 @@ const Renderer = {
      * to style the mol container.
      * @returns {object} clipboard options
      */
-    getContainerClassName: function() {
-        return this.getDivIdPrefix() + 'container';
+    getContainerClassName() {
+        return `${this.getDivIdPrefix()}container`;
     },
 
     /**
      * Override to change how the complete divId is generated.
      * @returns {string} the complete divId
      */
-    getDivIdTag: function(divId, uniqueId) {
+    getDivIdTag(divIdIn, uniqueId) {
+        let divId = divIdIn;
         if (typeof uniqueId !== 'undefined' && uniqueId !== null) {
             divId += `${this.getDivIdSeparator()}${uniqueId}`;
         }
@@ -176,8 +180,8 @@ const Renderer = {
      * Override to use a different divId prefix.
      * @returns {string} the divId prefix
      */
-    getDivIdPrefix: function() {
-        return this.getRdkStrRnrPrefix() + 'mol-';
+    getDivIdPrefix() {
+        return `${this.getRdkStrRnrPrefix()}mol-`;
     },
 
     /**
@@ -196,9 +200,9 @@ const Renderer = {
      * Override to use a different set of divId tags.
      * @returns {object} a dictionary mapping tag keys to tag names
      */
-    getDivAttrs: function() {
+    getDivAttrs() {
         if (!this._divAttrs) {
-            this._divAttrs = Object.fromEntries(DIV_ATTRS.map(k => [k, keyToTag(k)]));
+            this._divAttrs = Object.fromEntries(DIV_ATTRS.map((k) => [k, keyToTag(k)]));
         }
         return this._divAttrs;
     },
@@ -214,7 +218,7 @@ const Renderer = {
      * Override to customize the settings dialog.
      * @returns {SettingsDialog} SettingsDialog instance
      */
-    createSettingsDialog: function() {
+    createSettingsDialog() {
         return new SettingsDialog(this);
     },
 
@@ -229,10 +233,12 @@ const Renderer = {
      * userOpts to customize user opt entries.
      * @param {object} userOpts optional custom user opts
      */
-    setAvailUserOpts: function(userOpts) {
+    setAvailUserOpts(userOpts) {
         this._userOpts = Object.fromEntries(
-            Object.entries(userOpts || this.getDefaultUserOpts()).map(([k, text]) =>
-                [k, { tag: keyToTag(k), text }]));
+            Object.entries(userOpts || this.getDefaultUserOpts()).map(
+                ([k, text]) => [k, { tag: keyToTag(k), text }]
+            ),
+        );
     },
 
     /**
@@ -249,7 +255,7 @@ const Renderer = {
      * displayed in the SettingsDialog, but can still be set programmatically
      * through the HTML tag
      */
-    getAvailUserOpts: function() {
+    getAvailUserOpts() {
         if (!this._userOpts) {
             this.setAvailUserOpts();
         }
@@ -262,7 +268,7 @@ const Renderer = {
      * the values from the first div will be picked.
      * @returns {object} a dictionary relating opt name (all uppercase) to value
      */
-    getUserOptsForKey: function(key) {
+    getUserOptsForKey(key) {
         const divId = this.getFirstDivIdFromDivIdOrKey(key);
         let div;
         if (divId) {
@@ -276,14 +282,17 @@ const Renderer = {
      * All divs related to the same key will be updated.
      * @param {object} opts dictionary relating opt name (all uppercase) to value
      */
-    setUserOptsForKey: function(key, opts) {
+    setUserOptsForKey(key, opts) {
         const userOpts = this.getAvailUserOpts();
         Object.entries(opts).forEach(([opt, value]) => {
             const tag = userOpts[opt]?.tag;
-            tag && this.updateUserOptCache(key, tag, value);
+            if (tag) {
+                this.updateUserOptCache(key, tag, value);
+            }
         });
         this.getDivIdArrayFromDivIdOrKey(key).forEach(
-            divId => this.updateMolDrawDivIfNeeded(divId));
+            (divId) => this.updateMolDrawDivIfNeeded(divId)
+        );
     },
 
     /**
@@ -292,20 +301,19 @@ const Renderer = {
      * @returns {object} dictionary mapping each userOpt key to its
      * boolean or string value
      */
-    getUserOptsForDiv: function(div) {
+    getUserOptsForDiv(div) {
         return Object.fromEntries(Object.entries(this.getAvailUserOpts()).map(
-            ([k, { tag }]) => [k, this.getDivOpt(div, tag)]).filter(
-                ([, v]) => typeof v !== 'undefined'));
+            ([k, { tag }]) => [k, this.getDivOpt(div, tag)]
+        ).filter(([, v]) => typeof v !== 'undefined'));
     },
 
     /**
      * Number of spawned WebWorkers.
      * @returns {number} concurrency
      */
-    getConcurrency: function() {
+    getConcurrency() {
         if (!this._concurrency) {
-            this._concurrency = Math.min(
-                this.getHardwareConcurrency(), this.getMaxConcurrency());
+            this._concurrency = Math.min(this.getHardwareConcurrency(), this.getMaxConcurrency());
         }
         return this._concurrency;
     },
@@ -313,7 +321,7 @@ const Renderer = {
     /**
      * @returns {boolean} true if RDKitModule is available
      */
-    isRDKitReady: function() {
+    isRDKitReady() {
         if (!this._isRDKitReady) {
             this._isRDKitReady = _RDKitModule && typeof _RDKitModule.version === 'function';
         }
@@ -325,11 +333,11 @@ const Renderer = {
      * @param {string} type 'copy' or 'cog'
      * @returns {Element} HTML div containing the SVG icon
      */
-    getButtonIcon: function(type) {
+    getButtonIcon(type) {
         const div = document.createElement('div');
         const span = document.createElement('span');
         div.appendChild(span);
-        span.className = this.getRdkStrRnrPrefix() + 'button-icon';
+        span.className = `${this.getRdkStrRnrPrefix()}button-icon`;
         span.innerHTML = defaultIcons[type];
         return div;
     },
@@ -337,7 +345,7 @@ const Renderer = {
     /**
      * @returns {string} the URL where MinimalLib JS and WASM live
      */
-    getMinimalLibPath: function() {
+    getMinimalLibPath() {
         if (typeof this._minimalLibPath === 'undefined') {
             throw Error('ERROR: getMinimalLibPath() called before init()');
         }
@@ -348,10 +356,11 @@ const Renderer = {
      * Return user opts that can be checked by the user.
      * @returns {Array<object>} an array of { tag, text } dictionaries
      */
-    getCheckableUserOpts: function() {
+    getCheckableUserOpts() {
         if (!this._checkableUserOpts) {
-            this._checkableUserOpts = Object.values(
-                this.getAvailUserOpts()).filter(({ text }) => text !== null);
+            this._checkableUserOpts = Object.values(this.getAvailUserOpts()).filter(
+                ({ text }) => (text !== null)
+            );
         }
         return this._checkableUserOpts;
     },
@@ -362,15 +371,15 @@ const Renderer = {
      * css is falsy
      * @param {object} css key, value dictionary
      */
-    setRendererCss: function(css) {
-        const RDK_CSS_ID = this.getRdkStrRnrPrefix() + 'css';
+    setRendererCss(cssIn) {
+        const RDK_CSS_ID = `${this.getRdkStrRnrPrefix()}css`;
         let style = document.getElementById(RDK_CSS_ID);
         // if style already exists and no css is passed,
         // do nothing
-        if (style && !css) {
+        if (style && !cssIn) {
             return;
         }
-        css = css || this.getRendererCss();
+        let css = cssIn || this.getRendererCss();
         css = cssToText(css);
         if (!style) {
             style = document.createElement('style');
@@ -394,11 +403,13 @@ const Renderer = {
      * @returns {Promise} Promise that resolves to the RDKit module
      * once the latter is loaded and initialized
      */
-    init: function(minimalLibPath, basename) {
+    init(minimalLibPathIn, basenameIn) {
+        let basename = basenameIn;
+        let minimalLibPath = minimalLibPathIn;
         if (!basename) {
             basename = getMinimalLibBasename();
             if (!haveWebAssembly) {
-                basename += "_plainJs";
+                basename += '_plainJs';
             }
         }
         if (this.isRDKitReady()) {
@@ -415,13 +426,14 @@ const Renderer = {
             this._minimalLibJs = `${this._minimalLibPath}/${basename}.${packageVersion}.js`;
             if (!haveWindow) {
                 const modulePaths = ['', ...module.paths];
-                if (!modulePaths.some(path => {
+                if (!modulePaths.some((path) => {
                     try {
-                        minimalLibPath = (path ? path + '/' : path) + this._minimalLibJs;
+                        minimalLibPath = (path ? `${path}/` : path) + this._minimalLibJs;
                         // Using backticks avoids the following webpack warning:
                         // 'Critical dependency: the request of a dependency is an expression'
+                        // eslint-disable-next-line import/no-dynamic-require, global-require
                         _window.initRDKitModule = require(`${minimalLibPath}`);
-                    } catch(e) {
+                    } catch (e) {
                         if (e.code !== 'MODULE_NOT_FOUND') {
                             throw e;
                         }
@@ -441,7 +453,7 @@ const Renderer = {
         // if the RDKit module has already been initialzed, return it
         const _loadRDKitModule = (resolve) => {
             const TIMEOUT = 50;
-            const RDK_LOADER_ID = this.getRdkStrRnrPrefix() + 'loader';
+            const RDK_LOADER_ID = `${this.getRdkStrRnrPrefix()}loader`;
             if (typeof _RDKitModule === 'undefined') {
                 console.log(`rdkit-structure-renderer version: ${packageVersion}`);
                 _RDKitModule = null;
@@ -473,7 +485,7 @@ const Renderer = {
                         // _window.RDKitModule = _RDKitModule;
                         // uncomment to have the Renderer available in console for debugging
                         _window.RDKitStructureRenderer = this;
-                        console.log('RDKit version: ' + _RDKitModule.version());
+                        console.log(`RDKit version: ${_RDKitModule.version()}`);
                         return this;
                     })();
                 }
@@ -491,7 +503,7 @@ const Renderer = {
      * @param {Element} div molDiv
      * @returns {string} divId
      */
-    getDivId: function(div) {
+    getDivId(div) {
         if (!this._divIdRe) {
             this._divIdRe = new RegExp(`^(${this.getDivIdPrefix()})?(.*)$`);
         }
@@ -504,10 +516,11 @@ const Renderer = {
      * @param {Element|string} div molDiv
      * @returns {string} cacheKey
      */
-    getCacheKey: function(div) {
+    getCacheKey(div) {
         if (!this._cachedKeyRe) {
             this._cachedKeyRe = new RegExp(
-                `^(${this.getDivIdPrefix()})?(.*${this.getDivIdSeparator()})?(.*)$`);
+                `^(${this.getDivIdPrefix()})?(.*${this.getDivIdSeparator()})?(.*)$`
+            );
         }
         return (typeof div === 'object' ? div.id : div).match(this._cachedKeyRe)[3];
     },
@@ -519,10 +532,11 @@ const Renderer = {
      * div should be inserted
      * @returns {Array<String>} HTML tag array
      */
-    relatedNodes: function() {
+    relatedNodes() {
         if (!this._relatedNodes) {
-            this._relatedNodes = Object.keys(this.getDivAttrs()).filter(v =>
-                v.endsWith('_NODE')).map(k => this.getDivAttrs()[k]);
+            this._relatedNodes = Object.keys(this.getDivAttrs()).filter(
+                (v) => v.endsWith('_NODE')
+            ).map((k) => this.getDivAttrs()[k]);
         }
         return this._relatedNodes;
     },
@@ -531,7 +545,7 @@ const Renderer = {
      * currentDivs accessor.
      * @returns {Map} Map of currently mounted div attributes
      */
-    currentDivs: function() {
+    currentDivs() {
         if (!this._currentDivs) {
             this._currentDivs = new Map();
         }
@@ -543,7 +557,7 @@ const Renderer = {
      * @param {string} divId identifier for a div
      * @returns {Element} div corresponding to divId
      */
-    getMolDiv: function(divId) {
+    getMolDiv(divId) {
         return document.querySelector(`div[id=${this.getDivIdPrefix()}${divId}]`);
     },
 
@@ -553,7 +567,7 @@ const Renderer = {
      * @returns {Array<Element>} array of currently mounted mol divs
      * corresponding to key
      */
-    getMolDivsForKey: function(key) {
+    getMolDivsForKey(key) {
         return document.querySelectorAll(`div[id$=${this.getDivIdSeparator()}${key}`);
     },
 
@@ -561,8 +575,8 @@ const Renderer = {
      * Return array of currently mounted mol divs.
      * @returns {Array<Element>} array of currently mounted mol divs
      */
-    getMolDivArray: function() {
-        return document.querySelectorAll(`div[id^=${this.getDivIdPrefix()}]`)
+    getMolDivArray() {
+        return document.querySelectorAll(`div[id^=${this.getDivIdPrefix()}]`);
     },
 
     /**
@@ -590,15 +604,15 @@ const Renderer = {
     setButtonEnabled: (button, shouldEnable, useGreyOut) => {
         const modifyClass = (elem, item, disable) => {
             const re = new RegExp(`( ${item})*$`);
-            elem.className = elem.className.replace(re, disable ? ` ${item}` : '');
+            elem.setAttribute('class', elem.className.replace(re, disable ? ` ${item}` : ''));
         };
         const disable = !shouldEnable;
-        button.disabled = disable;
+        button.setAttribute('disabled', disable);
         if (useGreyOut) {
             const iconSpan = button.firstChild.firstChild;
             modifyClass(iconSpan, 'disabled-icon', disable);
             const label = button.parentNode;
-            if (label && label.nodeName === 'LABEL') {
+            if (label?.nodeName === 'LABEL') {
                 modifyClass(label, 'disabled-label', disable);
             }
         }
@@ -611,10 +625,12 @@ const Renderer = {
      * @param {boolean} useGreyOut if true, grey/ungrey out button
      * and associated label (if any)
      */
-    setButtonsEnabled: function(div, shouldEnable, useGreyOut) {
+    setButtonsEnabled(div, shouldEnable, useGreyOut) {
         this.getButtonTypes().forEach(({ type }) => {
             const button = this.getButton(div, type);
-            button && this.setButtonEnabled(button, shouldEnable, useGreyOut);
+            if (button) {
+                this.setButtonEnabled(button, shouldEnable, useGreyOut);
+            }
         });
     },
 
@@ -623,14 +639,16 @@ const Renderer = {
      * to clipboard operation failed.
      * @param {string} msg error message
      */
-    logClipboardError: (msg) =>
-        console.error(`${msg ? msg + '\n' : ''}Unable to copy to clipboard`),
+    logClipboardError: (msgIn) => {
+        const msg = msgIn ? `${msgIn}\n` : '';
+        console.error(`${msg}Unable to copy to clipboard`);
+    },
 
     /**
      * Return true if clipboard can be accessed.
      * @returns {boolean} true if clipboard can be accessed
      */
-    canAccessClipboard: async function() {
+    async canAccessClipboard() {
         let permissionStatus;
         try {
             permissionStatus = await navigator.permissions.query(this.getClipboardOpts());
@@ -649,7 +667,7 @@ const Renderer = {
      * Scheduler creator and accessor.
      * @returns {object} Scheduler
      */
-    scheduler: function() {
+    scheduler() {
         if (!this._scheduler) {
             const cleanupFunc = (divId) => {
                 const currentDiv = this.currentDivs().get(divId);
@@ -659,8 +677,9 @@ const Renderer = {
             };
             const concurrency = this.getConcurrency();
             const getDispatchers = concurrency
-                ? () => [...Array(concurrency).keys()].map(i => new Dispatcher(i, this.getMinimalLibPath()))
-                : () => [new LocalDispatcher(0, this.getRDKitModule())];
+                ? () => [...Array(concurrency).keys()].map(
+                    (i) => new Dispatcher(i, this.getMinimalLibPath())
+                ) : () => [new LocalDispatcher(0, this.getRDKitModule())];
             this._scheduler = new Scheduler({
                 getDispatchers,
                 cleanupFunc
@@ -677,14 +696,14 @@ const Renderer = {
      * result when the job is completed, or to null is the job
      * is aborted before being submitted
      */
-    submit: function(msg) {
+    submit(msg) {
         const currentDiv = this.currentDivs().get(msg.divId) || {};
         // if this message involves the same divId as the one the
         // the SettingsDialog is currently open on and a ChildQueue
         // was assigned, submit directly to the ChildQueue, otherwise
         // submit to the MainQueue
-        return (msg.divId === this.settings?.currentDivId && currentDiv.childQueue ?
-            currentDiv.childQueue.submit(msg) : this.scheduler().mainQueue.submit(msg));
+        return (msg.divId === this.settings?.currentDivId && currentDiv.childQueue
+            ? currentDiv.childQueue.submit(msg) : this.scheduler().mainQueue.submit(msg));
     },
 
     /**
@@ -699,7 +718,7 @@ const Renderer = {
      * containing the mol pickle (and possibly other results depending on
      * the job type), or to null if the job is aborted before being submitted
      */
-    requestMolPickle: function(divId, molText, scaffoldText, opts) {
+    requestMolPickle(divId, molText, scaffoldText, opts) {
         if (!molText) {
             return Promise.resolve({
                 pickle: null,
@@ -732,7 +751,7 @@ const Renderer = {
      * the SVG when the job is completed, or to null
      * if the job is aborted before being submitted
      */
-    requestSvg: function(divId, molPickle, opts) {
+    requestSvg(divId, molPickle, opts) {
         const type = 's';
         return this.submit({
             divId,
@@ -747,7 +766,7 @@ const Renderer = {
      * @param {Element} div
      * @returns {string} molecule description (SMILES, molblock, pkl_base64)
      */
-    getMol: function(div) {
+    getMol(div) {
         const attr = dataAttr(this.getDivAttrs().MOL);
         return decodeNewline(div.getAttribute(attr) || '');
     },
@@ -756,7 +775,7 @@ const Renderer = {
      * Increment the number of references to key by one
      * @param {string} key cache key
      */
-    incRef: function(key) {
+    incRef(key) {
         const cachedEntry = this.userOptCache[key] || {
             refCount: 0,
         };
@@ -769,7 +788,7 @@ const Renderer = {
      * When the number drops to zero, cached coordinates are deleted.
      * @param {string} key cache key
      */
-    decRef: function(key) {
+    decRef(key) {
         const cachedEntry = this.userOptCache[key];
         if (cachedEntry) {
             if (cachedEntry.refCount) {
@@ -787,7 +806,7 @@ const Renderer = {
      * @param {string} key cache key
      * @returns {object|null} { pickle, match } dictionary for current mol
      */
-    getCurrentMol: function(key) {
+    getCurrentMol(key) {
         return this.userOptCache[key]?.currentMol || null;
     },
 
@@ -795,7 +814,7 @@ const Renderer = {
      * Clear cached coordinates and match associated to a given key.
      * @param {string} key cache key
      */
-    clearCurrentMol: function(key) {
+    clearCurrentMol(key) {
         const cachedEntry = this.userOptCache[key];
         if (cachedEntry) {
             cachedEntry.currentMol = null;
@@ -808,7 +827,7 @@ const Renderer = {
      * @param {Uint8Array} pickle molecule pickle
      * @param {string} match scaffold match
      */
-    setCurrentMol: function(key, pickle, match) {
+    setCurrentMol(key, pickle, match) {
         const cachedEntry = this.userOptCache[key];
         if (cachedEntry) {
             cachedEntry.currentMol = {
@@ -826,7 +845,7 @@ const Renderer = {
      * a pipe symbol ('|', SMILES and pkl_base64) or by the SDF terminator
      * ('$$$$', molblock)
      */
-    getScaffold: function(div) {
+    getScaffold(div) {
         const attr = dataAttr(this.getDivAttrs().SCAFFOLD);
         return decodeNewline(div.getAttribute(attr) || '');
     },
@@ -838,9 +857,10 @@ const Renderer = {
      * @returns {object} object containing HTML tag name and
      * content as a key: value dictionary
      */
-    getRelatedNodes: function(div) {
-        return Object.fromEntries(this.relatedNodes().map(k =>
-            [dashToCamelCase(k), div.getAttribute(dataAttr(k))]));
+    getRelatedNodes(div) {
+        return Object.fromEntries(this.relatedNodes().map(
+            (k) => [dashToCamelCase(k), div.getAttribute(dataAttr(k))]
+        ));
     },
 
     /**
@@ -850,7 +870,7 @@ const Renderer = {
      * @param {string}  opt HTML tag name
      * @returns {object} object parsed from a JSON string
      */
-    getJsonOpt: function(div, opt) {
+    getJsonOpt(div, opt) {
         let value = null;
         const attr = dataAttr(opt);
         if (div.hasAttribute(attr)) {
@@ -872,7 +892,7 @@ const Renderer = {
      * @param {string} opt HTML tag name
      * @param {object} value key: value dictionary
      */
-    setJsonOpt: function(div, opt, value) {
+    setJsonOpt(div, opt, value) {
         let jsonValue = null;
         const attr = dataAttr(opt);
         if (value) {
@@ -896,7 +916,7 @@ const Renderer = {
      * @param {Element|string} div div or divId
      * @returns {object} draw options as a key: value dictionary
      */
-    getDrawOpts: function(div) {
+    getDrawOpts(div) {
         const res = { ...this.getDefaultDrawOpts() };
         if (typeof div === 'object') {
             Object.assign(res, this.getJsonOpt(div, this.getDivAttrs().DRAW_OPTS) || {});
@@ -911,7 +931,7 @@ const Renderer = {
      * @param {Element} div
      * @param {object} opts options as a key: value dictionary
      */
-    setDrawOpts: function(div, opts) {
+    setDrawOpts(div, opts) {
         let haveNonDefaultOpts = false;
         const nonDefaultOpts = Object.fromEntries(Object.entries(opts).filter(([k, v]) => {
             const defaultValue = this.getDefaultDrawOpt(k);
@@ -929,8 +949,8 @@ const Renderer = {
      * @param {string}  opt HTML tag name holding the option value
      * @param {boolean} value
      */
-    setDivOpt: function(div, opt, value) {
-        div.setAttribute(dataAttr(opt), value ? true : false);
+    setDivOpt(div, opt, value) {
+        div.setAttribute(dataAttr(opt), !!value);
     },
 
     /**
@@ -943,7 +963,7 @@ const Renderer = {
      * @param {Element} molDraw optional; HTML Element (either canvas or SVG div)
      * @@returns {string} result of the drawing call or null if failure
      */
-    write2DLayout: function(mol, drawOpts, molDraw) {
+    write2DLayout(molIn, drawOptsIn, molDrawIn) {
         const _write2DLayout = (mol, drawOpts, molDraw) => {
             let svg;
             if (typeof mol === 'object') {
@@ -955,7 +975,8 @@ const Renderer = {
                 if (type) {
                     if (type === 'CANVAS') {
                         return mol.draw_to_canvas_with_highlights(molDraw, drawOptsText);
-                    } else if (type !== 'DIV') {
+                    }
+                    if (type !== 'DIV') {
                         console.error(`write2DLayout: unsupported nodeName ${type}`);
                         return null;
                     }
@@ -971,13 +992,13 @@ const Renderer = {
                 molDraw.innerHTML = svg;
             }
             return svg;
-        }
+        };
         let res = null;
         try {
-            res = _write2DLayout(mol, drawOpts, molDraw);
+            res = _write2DLayout(molIn, drawOptsIn, molDrawIn);
         } catch {
             try {
-                res = _write2DLayout(mol, { ...drawOpts, kekulize: false }, molDraw);
+                res = _write2DLayout(molIn, { ...drawOptsIn, kekulize: false }, molDrawIn);
             } catch {
                 // if we fail we draw nothing
             }
@@ -997,7 +1018,7 @@ const Renderer = {
      * containing the mol pickle (and possibly other results depending on
      * the job type), or to null if the job is aborted before being submitted
      */
-    getPickledMolAndMatch: async function(divId, molText, scaffoldText, userOpts) {
+    async getPickledMolAndMatch(divId, molText, scaffoldText, userOpts) {
         const promArray = [];
         let res = null;
         // if the user wants to align to a scaffoldText or highlight
@@ -1015,7 +1036,7 @@ const Renderer = {
             }));
         }
         const resArray = await Promise.all(promArray);
-        if (resArray.every(res => res)) {
+        if (resArray.every((i) => i)) {
             // if a match was requested, it will be in the first Promise
             // otherwise it will be undefined
             const firstRes = resArray[0];
@@ -1041,7 +1062,7 @@ const Renderer = {
      * if the jobs was aborted, to a molblock if returnMolBlock === true,
      * and to '' otherwise.
      */
-    draw: async function(div, returnMolBlock) {
+    async draw(div, returnMolBlock) {
         // if the div has 0 size, do nothing, as it may have
         // already been unmounted
         const { width, height } = this.getRoundedDivSize(div);
@@ -1071,7 +1092,10 @@ const Renderer = {
             const divId = this.getDivId(div);
             if (!res) {
                 const molText = this.getMol(div);
-                res = await this.getPickledMolAndMatch(divId, molText, scaffoldText, { drawOpts, ...userOpts }) || {};
+                res = await this.getPickledMolAndMatch(divId, molText, scaffoldText, {
+                    drawOpts,
+                    ...userOpts,
+                }) || {};
             }
             const { pickle, match, rebuild } = res;
             if (pickle) {
@@ -1096,9 +1120,9 @@ const Renderer = {
                 }
                 const useSvg = (molDraw?.nodeName === 'DIV');
                 if (useSvg) {
-                    const res = await this.requestSvg(divId, pickle, { drawOpts, ...userOpts });
-                    if (res?.svg) {
-                        this.write2DLayout(res.svg, drawOpts, molDraw);
+                    const svgRes = await this.requestSvg(divId, pickle, { drawOpts, ...userOpts });
+                    if (svgRes?.svg) {
+                        this.write2DLayout(svgRes.svg, drawOpts, molDraw);
                     }
                 }
                 if (!useSvg || returnMolBlock) {
@@ -1115,8 +1139,8 @@ const Renderer = {
                                 }
                                 this.write2DLayout(mol, drawOpts, molDraw);
                             }
-                        } catch(e) {
-                            console.error(`Failed to draw to div`);
+                        } catch (e) {
+                            console.error('Failed to draw to div');
                         } finally {
                             mol.delete();
                         }
@@ -1145,9 +1169,9 @@ const Renderer = {
      * @param {Element} div
      * @returns {function} either the copyAction or cogAction function
      */
-    onButtonAction: function(e, type, div) {
+    onButtonAction(e, type, div) {
         e.stopPropagation();
-        return this[type + 'Action'](div);
+        return this[`${type}Action`](div);
     },
 
     /**
@@ -1157,7 +1181,7 @@ const Renderer = {
      * @returns {boolean} true if copy to clipboard succeeded, false
      * if it failed
      */
-    putClipboardContent: async function(content) {
+    async putClipboardContent(content) {
         // eslint-disable-next-line no-undef
         const item = new ClipboardItem(content);
         let res;
@@ -1166,7 +1190,7 @@ const Renderer = {
             res = true;
         } catch (e) {
             console.error('%O', e);
-            this.logClipboardError(`Failed to write content`);
+            this.logClipboardError('Failed to write content');
             res = false;
         }
         return res;
@@ -1177,16 +1201,17 @@ const Renderer = {
      * containing the respective chemical representations
      * associated to a given mol pickle.
      * @param {UInt8Array} pickle
-     * @param {Array} formats optional, array with formats that
+     * @param {Array} formatsIn optional, array with formats that
      * should be retrieved ('molblock', 'smiles', 'inchi')
      * @param {boolean} useMolBlockWedging whether the molblock should
      * be generated using original CTAB wedging information
      * @returns {object} dictionary with chemical representations
      */
-    getChemFormatsFromPickle: async function(pickle, formats, useMolBlockWedging) {
-        formats = formats || ['molblock', 'smiles', 'inchi'];
+    async getChemFormatsFromPickle(pickle, formatsIn, useMolBlockWedging) {
+        const formats = Array.isArray(formatsIn)
+            ? [...formatsIn] : ['molblock', 'smiles', 'inchi'];
         const molBlockParams = this.getMolblockParams(useMolBlockWedging);
-        const res = Object.fromEntries(formats.map(k => [k, '']));
+        const res = Object.fromEntries(formats.map((k) => [k, '']));
         const mol = await this.getMolFromPickle(pickle);
         if (mol) {
             if (res.molblock === '') {
@@ -1195,14 +1220,14 @@ const Renderer = {
             if (res.smiles === '') {
                 try {
                     res.smiles = mol.get_smiles();
-                } catch(e) {
+                } catch (e) {
                     console.error(`Failed to generate SMILES (${e})`);
                 }
             }
             if (res.inchi === '') {
                 try {
                     res.inchi = mol.get_inchi();
-                } catch(e) {
+                } catch (e) {
                     console.error(`Failed to generate InChI (${e})`);
                 }
             }
@@ -1220,7 +1245,7 @@ const Renderer = {
      * @param {UInt8Array} pickle
      * @returns {JSMol|null} RDKitJS molecule
      */
-    getMolFromPickle: async function(pickle) {
+    async getMolFromPickle(pickle) {
         // block until rdkitModule is ready
         const rdkitModule = await this.getRDKitModule();
         return getMolFromUInt8Array(rdkitModule, pickle);
@@ -1236,7 +1261,7 @@ const Renderer = {
      * @param {string} key cache key
      * @returns {object|null} { mol: JSMol, match: object } dictionary
      */
-    getMolAndMatchForKey: async function(key) {
+    async getMolAndMatchForKey(key) {
         const currentMol = this.getCurrentMol(key);
         let res = null;
         if (currentMol) {
@@ -1256,17 +1281,18 @@ const Renderer = {
      * @param {string} divIdOrKey cache key or divId
      * @returns {string} divId
      */
-    getFirstDivIdFromDivIdOrKey: function(divIdOrKey) {
+    getFirstDivIdFromDivIdOrKey(divIdOrKey) {
         let firstDivId = this.currentDivs().has(divIdOrKey) ? divIdOrKey : null;
         if (!firstDivId) {
             // note that an id may correspond to multiple divIds.
             // we will pick the first that matches our id
-            for (const divId of this.currentDivs().keys()) {
+            Array.from(this.currentDivs().keys()).every((divId) => {
                 if (divId.endsWith(this.getDivIdSeparator() + divIdOrKey)) {
                     firstDivId = divId;
-                    break;
+                    return false;
                 }
-            }
+                return true;
+            });
         }
         return firstDivId;
     },
@@ -1279,15 +1305,12 @@ const Renderer = {
      * @param {string} divIdOrKey cache key or divId
      * @returns {Array<string>} array of divIds
      */
-    getDivIdArrayFromDivIdOrKey: function(divIdOrKey) {
+    getDivIdArrayFromDivIdOrKey(divIdOrKey) {
         let divIdArray = this.currentDivs().has(divIdOrKey) ? [divIdOrKey] : null;
         if (!divIdArray) {
-            divIdArray = [];
-            for (const divId of this.currentDivs().keys()) {
-                if (divId.endsWith(this.getDivIdSeparator() + divIdOrKey)) {
-                    divIdArray.push(divId);
-                }
-            }
+            divIdArray = Array.from(this.currentDivs().keys()).filter(
+                (divId) => divId.endsWith(this.getDivIdSeparator() + divIdOrKey)
+            );
         }
         return divIdArray;
     },
@@ -1301,7 +1324,7 @@ const Renderer = {
      * see getImageFromMol for details
      * @returns {string|Blob} a string if format is 'svg' or a Blob if 'png'
      */
-    getImageFromDivIdOrKey: async function(divIdOrKey, opts) {
+    async getImageFromDivIdOrKey(divIdOrKey, opts) {
         let res = null;
         const divId = this.getFirstDivIdFromDivIdOrKey(divIdOrKey);
         const key = this.getCacheKey(divId || divIdOrKey);
@@ -1309,16 +1332,14 @@ const Renderer = {
         if (mol) {
             try {
                 const optsCopy = { ...opts };
-                optsCopy.match =  optsCopy.match || match;
-                let userOpts = {};
-                let drawOpts;
+                optsCopy.match = optsCopy.match || match;
                 const div = this.getMolDiv(divId);
-                userOpts = this.getUserOptsForDiv(div || divId) || {};
-                drawOpts = this.getDrawOpts(div || divId);
+                const userOpts = this.getUserOptsForDiv(div || divId) || {};
+                const drawOpts = this.getDrawOpts(div || divId);
                 optsCopy.userOpts = { ...userOpts, ...optsCopy.userOpts };
                 optsCopy.drawOpts = { ...drawOpts, ...optsCopy.drawOpts };
                 res = this.getImageFromMol(mol, optsCopy);
-            } catch(e) {
+            } catch (e) {
                 console.error(`Failed to get image for ${divId} (${e})`);
             } finally {
                 mol.delete();
@@ -1342,7 +1363,7 @@ const Renderer = {
      * @returns {string|Blob} a string if format is either 'svg' or 'base64png',
      * otherwise a Blob
      */
-    getImageFromMol: async function(mol, opts) {
+    async getImageFromMol(mol, opts) {
         if (!mol) {
             return null;
         }
@@ -1350,12 +1371,12 @@ const Renderer = {
             width,
             height,
             scaleFac,
-            format,
             match,
             transparent,
             userOpts,
             drawOpts
         } = opts;
+        const { format } = opts;
         let image = null;
         width = width || DEFAULT_IMG_OPTS.width;
         height = height || DEFAULT_IMG_OPTS.height;
@@ -1386,7 +1407,7 @@ const Renderer = {
         if (isSvg) {
             try {
                 image = this.write2DLayout(mol, drawOpts);
-            } catch(e) {
+            } catch (e) {
                 console.error(`Failed to generate SVG image (${e})`);
             }
         } else if (haveWindow) {
@@ -1394,17 +1415,19 @@ const Renderer = {
             this.resizeMolDraw(canvas, drawOpts.width, drawOpts.height, 1);
             try {
                 if (this.write2DLayout(mol, drawOpts, canvas) !== null) {
-                    image = isBase64Png ? canvas.toDataURL() :
-                        await new Promise(resolve => canvas.toBlob(image => resolve(image)));
+                    image = isBase64Png ? canvas.toDataURL()
+                        : await new Promise((resolve) => {
+                            canvas.toBlob((img) => resolve(img));
+                        });
                     if (!image) {
-                        console.error(`Failed to generate PNG image`);
+                        console.error('Failed to generate PNG image');
                     }
                 }
-            } catch(e) {
+            } catch (e) {
                 console.error(`Failed to draw to canvas (${e})`);
             }
         } else {
-            console.error("Canvas is not available on this platform");
+            console.error('Canvas is not available on this platform');
         }
         return image;
     },
@@ -1415,9 +1438,9 @@ const Renderer = {
      * @param {string|boolean} useMolBlockWedging can be a boolean or 'a'
      * @returns {string} get_molblock parameters as JSON string
      */
-    getMolblockParams: function(useMolBlockWedging) {
-        useMolBlockWedging = (typeof useMolBlockWedging === 'boolean'
-            ? useMolBlockWedging : true);
+    getMolblockParams(useMolBlockWedgingIn) {
+        const useMolBlockWedging = (typeof useMolBlockWedgingIn === 'boolean'
+            ? useMolBlockWedgingIn : true);
         const addChiralHs = !useMolBlockWedging;
         return JSON.stringify({ useMolBlockWedging, addChiralHs });
     },
@@ -1428,7 +1451,7 @@ const Renderer = {
      * @param {Array<String>} formats array of formats
      * to be copied to clipboard ('png', 'svg', 'molblock')
      */
-    putClipboardItem: async function(div, formats) {
+    async putClipboardItem(div, formats) {
         let molMatch = {};
         this.setButtonsEnabled(div, false);
         try {
@@ -1463,27 +1486,27 @@ const Renderer = {
                     const image = this.getImageFromMol(mol, opts);
                     if (!image) {
                         this.logClipboardError();
-                    } else {
-                        if (hasSvg) {
-                            // at the moment svg+xml MIME type is not supported by browsers
-                            // so we copy as plain text. This means SVG text will clobber molblock
-                            if (typeof image === 'string') {
-                                const type = 'text/plain';
-                                content[type] = new Blob([image], { type });
-                            }
-                        } else {
-                            content['image/png'] = image;
+                    } else if (hasSvg) {
+                        // at the moment svg+xml MIME type is not supported by browsers
+                        // so we copy as plain text. This means SVG text will clobber molblock
+                        if (typeof image === 'string') {
+                            const type = 'text/plain';
+                            content[type] = new Blob([image], { type });
                         }
+                    } else {
+                        content['image/png'] = image;
                     }
                 }
                 if (Object.keys(content).length) {
                     await this.putClipboardContent(content);
                 }
             }
-        } catch(e) {
+        } catch (e) {
             this.logClipboardError(`${e}`);
         } finally {
-            molMatch.mol && molMatch.mol.delete();
+            if (molMatch.mol) {
+                molMatch.mol.delete();
+            }
             this.setButtonsEnabled(div, true);
         }
     },
@@ -1492,7 +1515,7 @@ const Renderer = {
      * Called when the copy button on a given div is clicked.
      * @param {Element} div
      */
-    copyAction: async function(div) {
+    async copyAction(div) {
         if (await this.canAccessClipboard()) {
             await this.putClipboardItem(div, ['png', 'molblock']);
         }
@@ -1502,7 +1525,7 @@ const Renderer = {
      * Called when the cog button on a given div is clicked.
      * @param {Element} div
      */
-    cogAction: async function(div) {
+    async cogAction(div) {
         if (!this.settings) {
             this.settings = this.createSettingsDialog();
         }
@@ -1513,7 +1536,7 @@ const Renderer = {
      * Show the settings dialog.
      * Override to carry out specific actions before/after.
      */
-    showSettings: function() {
+    showSettings() {
         const tooltip = this.getTooltip('cog');
         if (tooltip && tooltip.isVisible()) {
             tooltip.hide();
@@ -1525,7 +1548,7 @@ const Renderer = {
      * Hide the settings dialog.
      * Override to carry out specific actions before/after.
      */
-    hideSettings: function() {
+    hideSettings() {
         this.settings.hide();
     },
 
@@ -1534,7 +1557,7 @@ const Renderer = {
      * when cog button on a given div is clicked.
      * @param {Element} div
      */
-    showOrHideSettings: function(div) {
+    showOrHideSettings(div) {
         const divId = this.getDivId(div);
         // if the SettingsDialog was visible and the user clicked
         // on the cog where the SettingsDialog currently is, hide it
@@ -1553,7 +1576,7 @@ const Renderer = {
      * @param {string} type either 'copy' or 'cog'
      * @returns {Element} HTML button element
      */
-    createButton: function(type) {
+    createButton(type) {
         this.buttons = this.buttons || {};
         if (!this.buttons[type]) {
             const div = document.createElement('div');
@@ -1577,7 +1600,7 @@ const Renderer = {
      * @param {number} containerHeight height of the container (px)
      * @param {number} containerWidth width of the container (px)
      */
-    setSpinnerWhlRadius: function(spinner, containerHeight, containerWidth) {
+    setSpinnerWhlRadius(spinner, containerHeight, containerWidth) {
         const whlRadius = Math.round(containerHeight * this.getWhlOpts().SCALE);
         let marginTop = Math.round(0.5 * (containerHeight - whlRadius)) - this.getWhlOpts().WIDTH;
         marginTop = `margin-top: ${marginTop}px; `;
@@ -1586,8 +1609,8 @@ const Renderer = {
             marginLeft = Math.round(0.5 * (containerWidth - whlRadius)) - this.getWhlOpts().WIDTH;
             marginLeft = `margin-left: ${marginLeft}px; `;
         }
-        const style = `${marginTop}${marginLeft}width: ${whlRadius}px; ` +
-            `height: ${whlRadius}px; border-width: ${this.getWhlOpts().WIDTH}px`
+        const style = `${marginTop}${marginLeft}width: ${whlRadius}px; `
+            + `height: ${whlRadius}px; border-width: ${this.getWhlOpts().WIDTH}px`;
         spinner.firstChild.setAttribute('style', style);
     },
 
@@ -1597,10 +1620,10 @@ const Renderer = {
      * @param {Element} div container div
      * @returns {Element} spinner div
      */
-    createSpinner: function(div) {
+    createSpinner(div) {
         if (!this._spinner) {
             const spinner = document.createElement('div');
-            spinner.className = this.getRdkStrRnrPrefix() + 'spinner';
+            spinner.className = `${this.getRdkStrRnrPrefix()}spinner`;
             const spinnerWhl = document.createElement('div');
             spinnerWhl.className = 'whl';
             spinner.appendChild(spinnerWhl);
@@ -1608,7 +1631,7 @@ const Renderer = {
         }
         const spinner = this._spinner.cloneNode(true);
         const { height } = this.getRoundedDivSize(div);
-        this.setSpinnerWhlRadius(spinner, height)
+        this.setSpinnerWhlRadius(spinner, height);
         return spinner;
     },
 
@@ -1617,13 +1640,13 @@ const Renderer = {
      * @param {Element} div container div
      * @returns {Element} spinner div
      */
-    getSpinner: function(div) {
+    getSpinner(div) {
         let spinner = div.getElementsByTagName('div');
         if (!spinner.length) {
             spinner = this.createSpinner(div);
             div.appendChild(spinner);
         } else {
-            spinner = spinner[0];
+            [spinner] = spinner;
         }
         return spinner;
     },
@@ -1638,11 +1661,11 @@ const Renderer = {
      * @param {Element} div
      * @returns {object} { width: integer, height: integer } dictionary
      */
-    getRoundedDivSize: function(div) {
+    getRoundedDivSize(div) {
         const divRect = div.getBoundingClientRect();
-        const width = parseInt(div.getAttribute(dataAttr(this.getDivAttrs().WIDTH)) || '0')
+        const width = parseInt(div.getAttribute(dataAttr(this.getDivAttrs().WIDTH)) || '0', 10)
             || Math.round(divRect.width) || DEFAULT_IMG_OPTS.width;
-        const height = parseInt(div.getAttribute(dataAttr(this.getDivAttrs().HEIGHT)) || '0')
+        const height = parseInt(div.getAttribute(dataAttr(this.getDivAttrs().HEIGHT)) || '0', 10)
             || Math.round(divRect.height) || DEFAULT_IMG_OPTS.height;
         return { width, height };
     },
@@ -1652,7 +1675,7 @@ const Renderer = {
      * @param {Element} molDraw HTML Element (either canvas or SVG div)
      * @returns {object} { width: integer, height: integer } dictionary
      */
-    resizeMolDraw: function(molDraw, width, height, scaleFac) {
+    resizeMolDraw(molDraw, width, height, scaleFac) {
         const scale = scaleFac || _window.devicePixelRatio;
         if (!(width > 0 && height > 0)) {
             return;
@@ -1661,7 +1684,9 @@ const Renderer = {
             molDraw.width = width * scale;
             molDraw.height = height * scale;
             const ctx = molDraw.getContext('2d');
-            ctx && ctx.scale(scale, scale);
+            if (ctx) {
+                ctx.scale(scale, scale);
+            }
         }
         molDraw.setAttribute('style', `width: ${width}px; height: ${height}px;`);
     },
@@ -1672,11 +1697,11 @@ const Renderer = {
      * @param {Element} div container div
      * @returns {Element} SVG div
      */
-    createSvgDiv: function(div) {
+    createSvgDiv(div) {
         if (!this._svgDiv) {
             const svgDiv = document.createElement('div');
             svgDiv.setAttribute('name', 'mol-draw');
-            svgDiv.className = this.getRdkStrRnrPrefix() + 'mol-draw';
+            svgDiv.className = `${this.getRdkStrRnrPrefix()}mol-draw`;
             svgDiv.appendChild(document.createTextNode(' '));
             this._svgDiv = svgDiv;
         }
@@ -1692,7 +1717,7 @@ const Renderer = {
      * @param {Element} div container div
      * @returns {Element} canvas
      */
-    createCanvas: function(div) {
+    createCanvas(div) {
         if (!this._canvas) {
             const canvas = document.createElement('canvas');
             canvas.setAttribute('name', 'mol-draw');
@@ -1709,7 +1734,7 @@ const Renderer = {
      * if it does not yet exist and returns it.
      * @returns {Array<string>} array of HTML attribute names
      */
-    divTags: function() {
+    divTags() {
         if (!this._divTags) {
             this._divTags = Object.values(this.getDivAttrs());
         }
@@ -1721,9 +1746,9 @@ const Renderer = {
      * if it does not yet exist and returns it.
      * @returns {Array<string>} array of user-defined option names
      */
-    userTags: function() {
+    userTags() {
         if (!this._userTags) {
-            this._userTags = Object.values(this.getAvailUserOpts()).map(item => item.tag);
+            this._userTags = Object.values(this.getAvailUserOpts()).map((i) => i.tag);
         }
         return this._userTags;
     },
@@ -1733,7 +1758,7 @@ const Renderer = {
      * if it does not yet exist and returns it.
      * @returns {Array<string>} array of HTML tags
      */
-    allTags: function() {
+    allTags() {
         if (!this._allTags) {
             this._allTags = this.divTags().concat(this.userTags());
         }
@@ -1751,7 +1776,7 @@ const Renderer = {
      * @param {string} userOpt name of the user-defined option
      * @param {boolean|string|null} value value to be stored
      */
-    updateUserOptCache: function(key, userOpt, value) {
+    updateUserOptCache(key, userOpt, value) {
         const cachedEntry = this.userOptCache[key] || {};
         if (userOpt) {
             const isBool = (typeof value === 'boolean');
@@ -1779,7 +1804,7 @@ const Renderer = {
      * is no value associated to userOpt in the cache
      *
      */
-    getCachedValue: function(key, userOpt) {
+    getCachedValue(key, userOpt) {
         const cachedEntry = this.userOptCache[key];
         let cachedValue;
         if (cachedEntry) {
@@ -1801,7 +1826,7 @@ const Renderer = {
      * @returns {any} value if the value was found, undefined if the value
      * was not found
      */
-    getDivOpt: function(div, userOpt) {
+    getDivOpt(div, userOpt) {
         const key = this.getCacheKey(div);
         let res = this.getCachedValue(key, userOpt);
         if (typeof res === 'undefined' && typeof div !== 'string') {
@@ -1816,7 +1841,7 @@ const Renderer = {
      * @returns true or false if v can be converted to boolean, otherwise v
      * as a string, or undefined if v is null
      */
-     toBool: (v) => {
+    toBool: (v) => {
         let res;
         if (typeof v === 'boolean') {
             return v;
@@ -1842,7 +1867,7 @@ const Renderer = {
      * @returns {boolean} true if the given key was previously
      * found not to match this scaffold, false if not
      */
-    getFailsMatch: function(key, scaffold) {
+    getFailsMatch(key, scaffold) {
         return (scaffold && this.getCachedValue(key, NO_MATCH) === scaffold);
     },
 
@@ -1852,7 +1877,7 @@ const Renderer = {
      * @param {string} key cache key
      * @param {string} scaffold scaffold definition (SMILES or CTAB)
      */
-    setFailsMatch: function(key, scaffold) {
+    setFailsMatch(key, scaffold) {
         this.updateUserOptCache(key, NO_MATCH, scaffold);
     },
 
@@ -1860,7 +1885,7 @@ const Renderer = {
      * Clear the 'fails scaffold match' flag on the given key.
      * @param {string} key cache key
      */
-    clearFailsMatch: function(key) {
+    clearFailsMatch(key) {
         this.updateUserOptCache(key, NO_MATCH, null);
     },
 
@@ -1872,7 +1897,7 @@ const Renderer = {
      * @returns {boolean} true if the given key had to undergo
      * coordinate generation ahead of alignment, false if not
      */
-    getWasRebuilt: function(key) {
+    getWasRebuilt(key) {
         return this.getCachedValue(key, WAS_REBUILT);
     },
 
@@ -1882,7 +1907,7 @@ const Renderer = {
      * @param {string} key cache key
      * @param {string} scaffold scaffold definition (SMILES or CTAB)
      */
-    setWasRebuilt: function(key) {
+    setWasRebuilt(key) {
         this.updateUserOptCache(key, WAS_REBUILT, true);
     },
 
@@ -1890,7 +1915,7 @@ const Renderer = {
      * Clear the 'was rebuilt' flag on the given key.
      * @param {string} key cache key
      */
-    clearWasRebuilt: function(key) {
+    clearWasRebuilt(key) {
         this.updateUserOptCache(key, WAS_REBUILT, null);
     },
 
@@ -1904,7 +1929,7 @@ const Renderer = {
      * which are persisted in a different cache.
      * @param {Element} divId id of the div that has been removed
      */
-    removeDiv: function(divId) {
+    removeDiv(divId) {
         if (this.settings?.molDiv) {
             const molDivId = this.getDivId(this.settings.molDiv);
             if (divId === molDivId) {
@@ -1925,7 +1950,7 @@ const Renderer = {
      * @param {string} text tooltip text
      * @returns {object} ButtonTooltip instance
      */
-    getTooltip: function(type, text) {
+    getTooltip(type, text) {
         if (!this._tooltips) {
             this._tooltips = {};
         }
@@ -1941,7 +1966,7 @@ const Renderer = {
      * @param {string} text tooltip text
      * @param {object} e event
      */
-    showHideTooltip: function(e, type, text) {
+    showHideTooltip(e, type, text) {
         const tooltip = this.getTooltip(type, text);
         if (e.type === 'mouseleave' && tooltip.isVisible()) {
             tooltip.hide();
@@ -1963,7 +1988,7 @@ const Renderer = {
      * @param {string} divId
      * @param {function} userOptsCallback optional callback
      */
-    updateMolDrawDiv: function(divId, userOptsCallback) {
+    updateMolDrawDiv(divId, userOptsCallback) {
         const div = this.getMolDiv(divId);
         if (!div) {
             return;
@@ -1972,8 +1997,9 @@ const Renderer = {
         this.setRendererCss();
         this.getSpinner(div);
         this.clearCurrentMol(key);
-        const divAttrs = Object.fromEntries(this.allTags().map(tag =>
-            [tag, div.getAttribute(dataAttr(tag))]));
+        const divAttrs = Object.fromEntries(this.allTags().map(
+            (tag) => [tag, div.getAttribute(dataAttr(tag))]
+        ));
         let molDraw = this.getMolDraw(div);
         const { width, height } = this.getRoundedDivSize(div);
         if (width > 0 && height > 0) {
@@ -1988,24 +2014,26 @@ const Renderer = {
         this.currentDivs().set(divId, divAttrs);
         this.getButtonTypes().forEach(({ type, tooltip }) => {
             let button = this.getButton(div, type);
-            const shouldHide = this.toBool(divAttrs[`hide-${type}`]);
+            const shouldHide = isIE11 || this.toBool(divAttrs[`hide-${type}`]);
             if (!shouldHide && !button) {
                 button = this.createButton(type);
                 if (tooltip) {
                     button.onmouseenter = (e) => {
-                        if (!(this.settings?.isVisible &&
-                            divId === this.settings.currentDivId &&
-                            e?.target?.firstChild?.className.includes('cog'))) {
+                        if (!(this.settings?.isVisible
+                            && divId === this.settings.currentDivId
+                            && e?.target?.firstChild?.className.includes('cog'))) {
                             this.showHideTooltip(e, type, tooltip);
                         }
-                    }
+                    };
                     button.onmouseleave = (e) => {
                         this.showHideTooltip(e, type, tooltip);
-                    }
+                    };
                 }
                 button.onclick = (e) => {
                     this.onButtonAction(e, type, div);
-                    button.onmouseleave && button.onmouseleave(e);
+                    if (button.onmouseleave) {
+                        button.onmouseleave(e);
+                    }
                 };
                 div.insertBefore(button, molDraw);
             } else if (shouldHide && button) {
@@ -2040,7 +2068,7 @@ const Renderer = {
      * @param {Element|string} divOrDivId div or divId
      * @returns {boolean} whether the div needs to be updated
      */
-    shouldDraw: function(divOrDivId) {
+    shouldDraw(divOrDivId) {
         let shouldDraw = false;
         let div;
         let divId;
@@ -2070,9 +2098,9 @@ const Renderer = {
         if (!shouldDraw) {
             const { width, height } = this.getRoundedDivSize(div);
             const areWidthHeightNonZero = (width > 0 && height > 0);
-            const currentWidth = parseInt(currentDivValue.width || '0');
-            const currentHeight = parseInt(currentDivValue.height || '0');
-            if (!areWidthHeightNonZero || currentWidth != width || currentHeight != height) {
+            const currentWidth = parseInt(currentDivValue.width || '0', 10);
+            const currentHeight = parseInt(currentDivValue.height || '0', 10);
+            if (!areWidthHeightNonZero || currentWidth !== width || currentHeight !== height) {
                 shouldDraw = true;
                 this.setSpinnerWhlRadius(this.getSpinner(div), height);
                 this.getMolDraw(div).innerHTML = '';
@@ -2080,7 +2108,7 @@ const Renderer = {
         }
         if (!shouldDraw) {
             const widthHeightTags = [this.getDivAttrs().WIDTH, this.getDivAttrs().HEIGHT];
-            shouldDraw = this.allTags().some(tag => {
+            shouldDraw = this.allTags().some((tag) => {
                 if (widthHeightTags.includes(tag)) {
                     return false;
                 }
@@ -2099,7 +2127,7 @@ const Renderer = {
      * @param {function} userOptsCallback optional callback
      * @returns {boolean} whether the div was updated
      */
-    updateMolDrawDivIfNeeded: function(divId, userOptsCallback) {
+    updateMolDrawDivIfNeeded(divId, userOptsCallback) {
         // if a redraw is needed, update
         const res = this.shouldDraw(divId);
         if (res) {
@@ -2111,10 +2139,10 @@ const Renderer = {
     /**
      * Update any div whose attributes have changed.
      */
-    updateMolDrawDivs: function(userOptsCallback) {
+    updateMolDrawDivs(userOptsCallback) {
         const seenDivKeys = new Set();
         const divArray = this.getMolDivArray();
-        divArray.forEach(div => {
+        divArray.forEach((div) => {
             const divId = this.getDivId(div);
             this.updateMolDrawDivIfNeeded(divId, userOptsCallback);
             seenDivKeys.add(divId);

@@ -30,32 +30,15 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-import Depiction from './Worker.js';
 import Dispatcher from './Dispatcher.js';
-
-class LocalWorker {
-    constructor(rdkitModule) {
-        this.rdkitModule = rdkitModule;
-    }
-
-    postMessage(data) {
-        const { wPort } = data;
-        if (!wPort) {
-            return;
-        }
-        delete data.wPort;
-        data.rdkitModule = this.rdkitModule;
-        wPort.postMessage(Depiction.get(data));
-        wPort.close();
-    }
-}
+import LocalWorker from './LocalWorker.js';
 
 class LocalDispatcher extends Dispatcher {
-
     /**
      * Create a local Worker and initialize it with an id.
      * @returns {LocalWorker} the created LocalWorker
      */
+    // eslint-disable-next-line class-methods-use-this
     async _createWorker(rdkitModule) {
         return new LocalWorker(await rdkitModule);
     }

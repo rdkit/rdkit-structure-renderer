@@ -31,18 +31,22 @@
 //
 
 import Queue from './Queue';
+import ChildQueue from './ChildQueue';
 
 /**
- * ChildQueue class:
- * - maintains a queue of jobs that depend on results previously
- *   submitted to the same ChildQueue
+ * MainQueue class:
+ * - maintains a queue of jobs
+ * - maintains a key, value dictionary of childQueues which
+ *   are tied to a specific divId when a job is submitted
+ *   by the SettingsDialog
  * - submits jobs to the Scheduler if not busy
  */
-class ChildQueue extends Queue {
-    constructor(mainQueue, divId) {
+class MainQueue extends Queue {
+    constructor(scheduler, cleanupFunc) {
         super();
-        this._mainQueue = mainQueue;
-        this.divId = divId;
+        this._scheduler = scheduler;
+        this._children = {};
+        this._cleanup = cleanupFunc;
     }
 
     /**
@@ -50,39 +54,67 @@ class ChildQueue extends Queue {
      * @returns {Scheduler} the Scheduler associated to this queue
      */
     scheduler() {
-        return this._mainQueue.scheduler();
+        return this._scheduler;
     }
 
     /**
-     * In a ChildQueue, a msg should be shifted from
-     * the queue only after it has been completed by the
-     * Dispatcher, and no more flushing should occur.
-     * @returns always false
+     * In the MainQueue, a msg should be shifted
+     * from the queue immediately after being submitted
+     * to the Dispatcher, to allow further flushing.
+     * @returns {boolean} always true
      */
     shouldFlush() {
-        return false;
+        this._q.shift();
+        return true;
     }
 
     /**
-     * Create a hash to identify a msg. The hash is a pipe-separated string:
-     * msgDivId|msgType|msgMolText
-     * @param {Object} msg the msg for which a hash is to be computed
-     * @returns {string} the computed hash
+     * Assign a new ChildQueue to this divId.
+     * @param {string} divId
+     * @returns {Object} the ChildQueue assigned to this divId.
      */
-    computeHash(msg) {
-        let hash = `${msg.divId}|${msg.type}|${msg.molText}`;
-        if (msg.scaffoldText) {
-            hash += `|${msg.scaffoldText}`;
-        }
-        if (msg.opts) {
-            const hashedOpts = Object.keys(msg.opts).sort().map((k) => msg[k]).join('|');
-            hash += `|${hashedOpts}`;
-        }
-        return hash;
+    addChild(divId) {
+        const childQueue = new ChildQueue(this, divId);
+        this._children[divId] = childQueue;
+        return childQueue;
     }
 
     /**
-     * Submit a job to this ChildQueue.
+     * Remove the ChildQueue assigned to this divId.
+     * @param {string} divId
+     */
+    removeChild(divId) {
+        delete this._children[divId];
+    }
+
+    /**
+     * Returns the array of children queues associated
+     * to this MainQueue.
+     * @returns {Array<ChildQueue>} an array of ChildQueue
+     */
+    children() {
+        return Object.values(this._children);
+    }
+
+    /**
+     * Loops through the {divId: ChildQueue} dictionary and removes
+     * empty entries; quits the loop at the first non-empty entry.
+     */
+    removeEmptyChildren() {
+        Object.entries(this._children).every(([divId, child]) => {
+            const isEmpty = child.isEmpty();
+            if (isEmpty) {
+                this.removeChild(divId);
+                if (this._cleanup) {
+                    this._cleanup(divId);
+                }
+            }
+            return isEmpty;
+        });
+    }
+
+    /**
+     * Submit a job to this MainQueue.
      * @param  {Object} msg the msg describing the job
      * @returns {Promise} a Promise that will resolve to the
      * result when the job is completed, or to null is the job
@@ -91,25 +123,21 @@ class ChildQueue extends Queue {
     submit(msg) {
         const res = this.submitWhenWorkerAvailable(msg);
         this._q.push(msg);
-        const hash = this.computeHash(msg);
-        const lastIdx = this._q.length - 1;
-        let shouldAbort = false;
-        this._q.forEach((qMsg, i) => {
-            if (qMsg.type) {
-                if (shouldAbort) {
-                    qMsg.type = null;
-                    qMsg.qPort.postMessage({ shouldAbort });
-                    qMsg.qPort.close();
-                } else if (i !== lastIdx && this.computeHash(qMsg) === hash) {
-                    shouldAbort = true;
-                }
-            }
-        });
-        if (!shouldAbort && this._q.length === 1) {
-            this.flush();
-        }
+        this.flush();
         return res;
+    }
+
+    /**
+     * Abort jobs connected to divId, whether they are
+     * in the main queue or in any child queue
+     * @param {string} divId jobs connected with this
+     * identifier will be aborted
+     */
+    abortJobs(divId) {
+        this.purge(divId);
+        this.children().forEach((child) => child.purge(divId));
+        this.removeEmptyChildren(this._cleanup);
     }
 }
 
-export default ChildQueue;
+export default MainQueue;

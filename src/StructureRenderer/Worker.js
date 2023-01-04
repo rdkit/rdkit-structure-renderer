@@ -5,7 +5,7 @@ import {
     isBase64Pickle,
     isMolBlock,
     splitScaffoldText,
-} from './utils.js';
+} from './utils';
 
 const Depiction = {
     extractBase64Pickle,
@@ -178,9 +178,9 @@ const Depiction = {
         molText,
         scaffoldText,
         molPickle,
-        optsIn,
+        opts,
     }) {
-        const opts = optsIn || {};
+        const optsLocal = opts || {};
         let rebuild = false;
         const pickle = new Uint8Array();
         let match = null;
@@ -197,7 +197,7 @@ const Depiction = {
         const isBehaviorAuto = {};
         const setBehavior = (autoOptions) => {
             Object.keys(autoOptions).forEach((optName) => {
-                switch (opts[optName]) {
+                switch (optsLocal[optName]) {
                 case true:
                     isBehaviorAuto[optName] = false;
                     behavior[optName] = true;
@@ -223,18 +223,18 @@ const Depiction = {
         if (mol) {
             try {
                 rebuild = !mol.has_coords();
-                const abbreviate = opts.ABBREVIATE;
-                let { drawOpts } = opts;
+                const abbreviate = optsLocal.ABBREVIATE;
+                let { drawOpts } = optsLocal;
                 drawOpts = drawOpts || {};
                 const { width, height } = drawOpts;
                 const canonicalizeDir = (typeof width === 'number'
                     && typeof height === 'number' && width < height ? -1 : 1);
                 setBehavior({
                     MOL_NORMALIZE: true,
-                    MOL_CANONICALIZE: rebuild || opts.RECOMPUTE2D,
+                    MOL_CANONICALIZE: rebuild || optsLocal.RECOMPUTE2D,
                     MOL_STRAIGHTEN: true,
-                    ALIGN_REBUILD: opts.RECOMPUTE2D,
-                    USE_MOLBLOCK_WEDGING: !(rebuild || opts.RECOMPUTE2D),
+                    ALIGN_REBUILD: optsLocal.RECOMPUTE2D,
+                    USE_MOLBLOCK_WEDGING: !(rebuild || optsLocal.RECOMPUTE2D),
                 });
                 const normalize = behavior.MOL_NORMALIZE;
                 let straighten = behavior.MOL_STRAIGHTEN;
@@ -251,7 +251,7 @@ const Depiction = {
                     break;
                 }
                 case 'a': {
-                    useCoordGen = opts.RECOMPUTE2D;
+                    useCoordGen = optsLocal.RECOMPUTE2D;
                     setBehavior({
                         SCAFFOLD_NORMALIZE: true,
                         SCAFFOLD_CANONICALIZE: false,
@@ -371,7 +371,7 @@ const Depiction = {
                         rebuild = false;
                         straighten = false;
                         canonicalize = 0;
-                    } else if (opts.RECOMPUTE2D) {
+                    } else if (optsLocal.RECOMPUTE2D) {
                         useMolblockWedging = false;
                         rebuild = true;
                     }

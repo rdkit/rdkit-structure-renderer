@@ -30,9 +30,9 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-import { RDK_STR_RNR } from './constants.js';
-import ButtonTooltip from './ButtonTooltip.js';
-import { getElementCenter, getViewPortRect } from './utils.js';
+import { RDK_STR_RNR } from './constants';
+import ButtonTooltip from './ButtonTooltip';
+import { getElementCenter, getViewPortRect } from './utils';
 
 /**
  * SettingsDialog class:

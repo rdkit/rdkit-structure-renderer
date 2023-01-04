@@ -39,12 +39,7 @@ module.exports = () => {
 
     const moduleConfig = {
         ...config,
-        entry: {
-            app: [
-                "core-js/stable/string/trim-end",
-                "./pkg/dist-src/index.js"
-            ]
-        },
+        entry: "./pkg/dist-src/index.js",
         experiments: {
             outputModule: true,
         },

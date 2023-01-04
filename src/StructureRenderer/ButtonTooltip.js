@@ -30,7 +30,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-import { getElementCenter, getViewPortRect } from './utils.js';
+import { getElementCenter, getViewPortRect } from './utils';
 
 /**
  * ButtonTooltip class:

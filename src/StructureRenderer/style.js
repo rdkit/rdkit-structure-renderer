@@ -30,7 +30,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-import { RDK_STR_RNR } from './constants.js';
+import { RDK_STR_RNR } from './constants';
 
 const css = {
     [`.${RDK_STR_RNR}mol-container`]: {

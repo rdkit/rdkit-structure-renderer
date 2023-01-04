@@ -30,14 +30,14 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-import defaultRendererCss from './style.js';
-import defaultDialogHtml from './dialog.js';
-import defaultIcons from './icons.js';
-import Scheduler from './Scheduler.js';
-import Dispatcher from './Dispatcher.js';
-import LocalDispatcher from './LocalDispatcher.js';
-import SettingsDialog from './SettingsDialog.js';
-import ButtonTooltip from './ButtonTooltip.js';
+import defaultRendererCss from './style';
+import defaultDialogHtml from './dialog';
+import defaultIcons from './icons';
+import Scheduler from './Scheduler';
+import Dispatcher from './Dispatcher';
+import LocalDispatcher from './LocalDispatcher';
+import SettingsDialog from './SettingsDialog';
+import ButtonTooltip from './ButtonTooltip';
 import {
     getMinimalLibBasename,
     cssToText,
@@ -47,7 +47,7 @@ import {
     getMolblockFromMol,
     getMolFromUInt8Array,
     keyToTag,
-} from './utils.js';
+} from './utils';
 import {
     DEFAULT_IMG_OPTS,
     DEFAULT_DRAW_OPTS,
@@ -60,8 +60,8 @@ import {
     WAS_REBUILT,
     CLIPBOARD_OPTS,
     WHL_OPTS,
-} from './constants.js';
-import { version as packageVersion } from '../version.js';
+} from './constants';
+import { version as packageVersion } from '../version';
 
 let _RDKitModule;
 const haveWindow = (typeof window !== 'undefined');

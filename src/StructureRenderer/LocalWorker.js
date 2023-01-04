@@ -30,7 +30,24 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-import Renderer from './StructureRenderer/Renderer';
+import Depiction from './Worker';
 
-export { Renderer };
-export default Renderer;
+class LocalWorker {
+    constructor(rdkitModule) {
+        this.rdkitModule = rdkitModule;
+    }
+
+    postMessage(dataIn) {
+        const data = { ...dataIn };
+        const { wPort } = data;
+        if (!wPort) {
+            return;
+        }
+        delete data.wPort;
+        data.rdkitModule = this.rdkitModule;
+        wPort.postMessage(Depiction.get(data));
+        wPort.close();
+    }
+}
+
+export default LocalWorker;

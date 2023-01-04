@@ -30,9 +30,9 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-import Depiction from './Worker.js';
-import { getMinimalLibBasename } from './utils.js';
-import { version as packageVersion } from '../version.js';
+import Depiction from './Worker';
+import { getMinimalLibBasename } from './utils';
+import { version as packageVersion } from '../version';
 
 class Dispatcher {
     constructor(id, minimalLibPath) {
@@ -50,11 +50,12 @@ class Dispatcher {
      */
     _getWorkerBlob(minimalLibPath) {
         return [
+            // eslint-disable-next-line indent
 `importScripts('${minimalLibPath}/${getMinimalLibBasename()}.${packageVersion}.js');
 const rdkitReady = initRDKitModule({
     locateFile: () => '${minimalLibPath}/${getMinimalLibBasename()}.${packageVersion}.wasm',
 });
-const Depiction = {${Object.keys(Depiction).map(k => `${k}: ${Depiction[k]}`).join(',')}};
+const Depiction = {${Object.keys(Depiction).map((k) => `${k}: ${Depiction[k]}`).join(',')}};
 
 const main = (rdkitReady, dispatcherId) => {
     onmessage = ({ data }) => rdkitReady.then(rdkitModule => {
@@ -69,7 +70,7 @@ const main = (rdkitReady, dispatcherId) => {
     });
     console.log('worker ' + dispatcherId.toString() + ' ready');
 };
-main(rdkitReady, ${this.id});`
+main(rdkitReady, ${this.id});`,
         ];
     }
 
@@ -80,9 +81,9 @@ main(rdkitReady, ${this.id});`
      */
     _createWorker(minimalLibPath) {
         if (typeof Worker === 'undefined') {
-            throw Error("Workers are not supported");
+            throw Error('Workers are not supported');
         }
-        return new Promise(resolve => {
+        return new Promise((resolve) => {
             const blob = new Blob(this._getWorkerBlob(minimalLibPath));
             const url = window.URL || window.webkitURL;
             const blobUrl = url.createObjectURL(blob);
@@ -148,7 +149,7 @@ main(rdkitReady, ${this.id});`
                     }
                     resolve(true);
                 } else {
-                    port1 = _sendMsg();
+                    port1 = _parseMsg.sendMsg();
                 }
             };
             const _sendMsg = () => {
@@ -158,7 +159,8 @@ main(rdkitReady, ${this.id});`
                 (async () => (await this._worker).postMessage(pingMsg, [msgChannel.port2]))();
                 return msgChannel.port1;
             };
-            this._ready = await new Promise(resolve => {
+            _parseMsg.sendMsg = _sendMsg;
+            this._ready = await new Promise((resolve) => {
                 _sendMsg.resolve = resolve;
                 port1 = _sendMsg();
                 tid = setInterval(_parseMsg, TIMEOUT);

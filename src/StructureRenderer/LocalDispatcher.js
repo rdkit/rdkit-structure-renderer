@@ -30,8 +30,8 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-import Dispatcher from './Dispatcher.js';
-import LocalWorker from './LocalWorker.js';
+import Dispatcher from './Dispatcher';
+import LocalWorker from './LocalWorker';
 
 class LocalDispatcher extends Dispatcher {
     /**

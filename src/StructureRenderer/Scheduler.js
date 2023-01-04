@@ -30,7 +30,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-import MainQueue from './MainQueue.js';
+import MainQueue from './MainQueue';
 
 class Scheduler {
     constructor({ getDispatchers, cleanupFunc }) {

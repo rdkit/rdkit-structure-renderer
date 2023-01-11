@@ -416,11 +416,15 @@ const Renderer = {
             return Promise.resolve(this);
         }
         if (!this._minimalLibJs) {
+            let shouldTrim = false;
             if (typeof minimalLibPath !== 'string') {
                 minimalLibPath = document.currentScript?.src || '';
+                shouldTrim = true;
+            } else if (minimalLibPath.endsWith('/') || minimalLibPath.endsWith('.js')) {
+                shouldTrim = true;
+            }
+            if (shouldTrim) {
                 minimalLibPath = minimalLibPath.substring(0, minimalLibPath.lastIndexOf('/'));
-            } else if (minimalLibPath.length && minimalLibPath[minimalLibPath.length - 1] === '/') {
-                minimalLibPath = minimalLibPath.substring(0, minimalLibPath.length - 1);
             }
             this._minimalLibPath = minimalLibPath;
             this._minimalLibJs = `${this._minimalLibPath}/${basename}.${packageVersion}.js`;

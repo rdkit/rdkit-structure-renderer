@@ -394,11 +394,14 @@ const Renderer = {
      * @returns {Promise} Promise that resolves to the RDKit module
      * once the latter is loaded and initialized
      */
-    init: function(minimalLibPath, basename) {
+    init: function(minimalLibPathIn, basenameIn) {
+        const takeParent = (path) => path.substring(0, path.lastIndexOf('/'));
+        let basename = basenameIn;
+        let minimalLibPath = minimalLibPathIn;
         if (!basename) {
             basename = getMinimalLibBasename();
             if (!haveWebAssembly) {
-                basename += "_plainJs";
+                basename += '_plainJs';
             }
         }
         if (this.isRDKitReady()) {
@@ -407,17 +410,21 @@ const Renderer = {
         if (!this._minimalLibJs) {
             if (typeof minimalLibPath !== 'string') {
                 minimalLibPath = document.currentScript?.src || '';
-                minimalLibPath = minimalLibPath.substring(0, minimalLibPath.lastIndexOf('/'));
-            } else if (minimalLibPath.length && minimalLibPath[minimalLibPath.length - 1] === '/') {
-                minimalLibPath = minimalLibPath.substring(0, minimalLibPath.length - 1);
+            }
+            if (minimalLibPath.endsWith('/')) {
+                minimalLibPath = takeParent(minimalLibPath);
+            }
+            if (minimalLibPath.endsWith('.js')) {
+                minimalLibPath = takeParent(minimalLibPath);
             }
             this._minimalLibPath = minimalLibPath;
-            this._minimalLibJs = `${this._minimalLibPath}/${basename}.${packageVersion}.js`;
+            const minimalLibName = `${basename}.${packageVersion}.js`;
+            this._minimalLibJs = `${this._minimalLibPath}/${minimalLibName}`;
             if (!haveWindow) {
                 const modulePaths = ['', ...module.paths];
                 if (!modulePaths.some(path => {
                     try {
-                        minimalLibPath = (path ? path + '/' : path) + this._minimalLibJs;
+                        minimalLibPath = `${path ? path + '/' : ''}${this._minimalLibJs}`;
                         // Using backticks avoids the following webpack warning:
                         // 'Critical dependency: the request of a dependency is an expression'
                         _window.initRDKitModule = require(`${minimalLibPath}`);

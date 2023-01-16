@@ -104,6 +104,20 @@ const keyToTag = (k) => k.toLowerCase().replace(/_/g, '-');
 const tagToKey = (t) => t.toUpperCase().replace(/-/g, '_');
 
 /**
+ * Add in place the drawing options needed to visualize
+ * wedging as encoded in the molblock rather than recomputing
+ * wedging with RDKit.
+ * @param {Object} drawOpts drawing options to be modified in place
+ */
+const setMolblockWedgingDrawOpts = (drawOpts) => {
+    Object.assign(drawOpts, {
+        useMolBlockWedging: true,
+        wedgeBonds: false,
+        addChiralHs: false,
+    });
+};
+
+/**
  * Converts a mol into its molblock representation.
  * It tries to get a kekulized molblock first
  * and fall back to aromatic if the former fails.
@@ -247,6 +261,7 @@ export {
     camelCaseToDash,
     keyToTag,
     tagToKey,
+    setMolblockWedgingDrawOpts,
     getMolblockFromMol,
     extractBase64Pickle,
     getMolFromUInt8Array,

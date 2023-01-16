@@ -429,8 +429,7 @@ class SettingsDialog {
         });
         const userOpts = this.renderer.getUserOptsForDiv(div);
         const formats = await this.renderer.getChemFormatsFromPickle(
-            this.renderer.getCurrentMol(key).pickle, null, userOpts.USE_MOLBLOCK_WEDGING
-        );
+            this.renderer.getCurrentMol(key).pickle, null, userOpts);
         Object.entries(formats).forEach(([format, value]) => {
             this.textArea[format].value = value;
         });

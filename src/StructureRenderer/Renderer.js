@@ -47,6 +47,7 @@ import {
     getMolblockFromMol,
     getMolFromUInt8Array,
     keyToTag,
+    setMolblockWedgingDrawOpts,
 } from './utils';
 import {
     DEFAULT_IMG_OPTS,
@@ -729,6 +730,7 @@ const Renderer = {
                 match: null,
                 svg: null,
                 rebuild: null,
+                useMolBlockWedging: null,
             });
         }
         let type = 'r';
@@ -1048,7 +1050,8 @@ const Renderer = {
             res = {
                 match: firstRes.match,
                 rebuild: firstRes.rebuild,
-                // the pickle will always be from the last promise
+                // pickle and useMolBlockWedging will always be from the last promise
+                useMolBlockWedging: lastRes.useMolBlockWedging,
                 pickle: lastRes.pickle,
             };
         }
@@ -1079,13 +1082,16 @@ const Renderer = {
             const molDraw = this.getMolDraw(div);
             const userOpts = this.getUserOptsForDiv(div);
             const drawOpts = this.getDrawOpts(div);
-            if (typeof userOpts.USE_MOLBLOCK_WEDGING === 'undefined'
-                || userOpts.USE_MOLBLOCK_WEDGING) {
-                Object.assign(drawOpts, {
-                    useMolBlockWedging: true,
-                    wedgeBonds: false,
-                    addChiralHs: false,
-                });
+            const getOrigWedgingOpts = (drawOptsIn) => {
+                const { useMolBlockWedging, wedgeBonds, addChiralHs } = drawOptsIn;
+                return { useMolBlockWedging, wedgeBonds, addChiralHs };
+            };
+            const origWedgingOpts = getOrigWedgingOpts(drawOpts);
+            let useMolBlockWedging = (
+                typeof userOpts.USE_MOLBLOCK_WEDGING === 'undefined' || userOpts.USE_MOLBLOCK_WEDGING
+            );
+            if (useMolBlockWedging) {
+                setMolblockWedgingDrawOpts(drawOpts);
             }
             drawOpts.addAtomIndices = userOpts.ATOM_IDX;
             drawOpts.width = width;
@@ -1102,6 +1108,7 @@ const Renderer = {
                 }) || {};
             }
             const { pickle, match, rebuild } = res;
+            useMolBlockWedging = res.useMolBlockWedging;
             if (pickle) {
                 this.setCurrentMol(key, pickle, match);
                 if (userOpts.SCAFFOLD_ALIGN || userOpts.SCAFFOLD_HIGHLIGHT) {
@@ -1122,6 +1129,16 @@ const Renderer = {
                     delete drawOpts.atoms;
                     delete drawOpts.bonds;
                 }
+                if (!useMolBlockWedging) {
+                    Object.entries(origWedgingOpts).forEach(([k, v]) => {
+                        if (typeof v === 'undefined') {
+                            delete drawOpts[k];
+                        } else {
+                            drawOpts[k] = v;
+                        }
+                    });
+                    userOpts.USE_MOLBLOCK_WEDGING = false;
+                }
                 const useSvg = (molDraw?.nodeName === 'DIV');
                 if (useSvg) {
                     const svgRes = await this.requestSvg(divId, pickle, { drawOpts, ...userOpts });
@@ -1134,7 +1151,7 @@ const Renderer = {
                     if (mol) {
                         try {
                             if (returnMolBlock) {
-                                const molBlockParams = this.getMolblockParams(userOpts.USE_MOLBLOCK_WEDGING);
+                                const molBlockParams = this.getMolblockParams(useMolBlockWedging);
                                 molblock = getMolblockFromMol(mol, molBlockParams);
                             }
                             if (!useSvg) {
@@ -1211,13 +1228,14 @@ const Renderer = {
      * be generated using original CTAB wedging information
      * @returns {object} dictionary with chemical representations
      */
-    async getChemFormatsFromPickle(pickle, formatsIn, useMolBlockWedging) {
+    async getChemFormatsFromPickle(pickle, formatsIn, userOpts) {
         const formats = Array.isArray(formatsIn)
             ? [...formatsIn] : ['molblock', 'smiles', 'inchi'];
-        const molBlockParams = this.getMolblockParams(useMolBlockWedging);
         const res = Object.fromEntries(formats.map((k) => [k, '']));
         const mol = await this.getMolFromPickle(pickle);
         if (mol) {
+            const useMolBlockWedging = this.shouldUseMolBlockWedging(mol, userOpts);
+            const molBlockParams = this.getMolblockParams(useMolBlockWedging);
             if (res.molblock === '') {
                 res.molblock = getMolblockFromMol(mol, molBlockParams);
             }
@@ -1437,6 +1455,25 @@ const Renderer = {
     },
 
     /**
+     * Return whether useMolBlockWedging should be set to true or not
+     * based on desired user visualization options and the presence
+     * of coordinates on the molecule.
+     * @param {JSMol} mol RDKitJS molecule
+     * @param {Object} userOpts user options
+     * @returns {boolean} whether useMolBlockWedging should be set to true
+     */
+    shouldUseMolBlockWedging: (mol, userOpts) => {
+        if (!mol.has_coords() || userOpts.RECOMPUTE2D) {
+            return false;
+        }
+        let shouldUse = userOpts.USE_MOLBLOCK_WEDGING;
+        if (typeof shouldUse !== 'boolean') {
+            shouldUse = true;
+        }
+        return shouldUse;
+    },
+
+    /**
      * Generate appropriate JSON parameters for get_molblock()
      * based on the value of the useMolBlockWedging parameter.
      * @param {string|boolean} useMolBlockWedging can be a boolean or 'a'
@@ -1472,7 +1509,8 @@ const Renderer = {
                 const content = {};
                 if (formats.includes('molblock')) {
                     const type = 'text/plain';
-                    const molBlockParams = this.getMolblockParams(userOpts.USE_MOLBLOCK_WEDGING);
+                    const useMolBlockWedging = this.shouldUseMolBlockWedging(mol, userOpts);
+                    const molBlockParams = this.getMolblockParams(useMolBlockWedging);
                     const molblock = getMolblockFromMol(mol, molBlockParams);
                     content[type] = new Blob([molblock], { type });
                 }

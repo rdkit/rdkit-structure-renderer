@@ -5,6 +5,7 @@ import {
     isBase64Pickle,
     isMolBlock,
     splitScaffoldText,
+    setMolblockWedgingDrawOpts,
 } from './utils';
 
 const Depiction = {
@@ -14,6 +15,7 @@ const Depiction = {
     isBase64Pickle,
     isMolBlock,
     splitScaffoldText,
+    setMolblockWedgingDrawOpts,
 
     /**
      * Generate molecule from SMILES, CTAB or pkl_base64.
@@ -185,11 +187,13 @@ const Depiction = {
         const pickle = new Uint8Array();
         let match = null;
         let svg = null;
+        let useMolBlockWedging = null;
         const res = {
             pickle,
             match,
             svg,
             rebuild,
+            useMolBlockWedging,
         };
         let mol;
         let useCoordGen = false;
@@ -240,7 +244,7 @@ const Depiction = {
                 let straighten = behavior.MOL_STRAIGHTEN;
                 let canonicalize = (behavior.MOL_CANONICALIZE ? canonicalizeDir : 0);
                 let alignRebuild = behavior.ALIGN_REBUILD;
-                let useMolblockWedging = behavior.USE_MOLBLOCK_WEDGING;
+                useMolBlockWedging = mol.has_coords() && behavior.USE_MOLBLOCK_WEDGING;
                 switch (type) {
                 case 'c': {
                     rebuild = true;
@@ -265,6 +269,10 @@ const Depiction = {
                     }
                     const canonicalizeScaffoldStored = behavior.SCAFFOLD_CANONICALIZE ? canonicalizeDir : 0;
                     match = null;
+                    if (alignRebuild) {
+                        useMolBlockWedging = false;
+                    }
+                    const alignOnly = !alignRebuild;
                     const scaffoldTextArray = this.splitScaffoldText(scaffoldText);
                     const scaffoldIteratorArray = [];
                     scaffoldTextArray.every((maybeMultiScaffoldText) => {
@@ -331,7 +339,7 @@ const Depiction = {
                                     useCoordGen: true,
                                     allowRGroups: true,
                                     acceptFailure: false,
-                                    alignOnly: !alignRebuild,
+                                    alignOnly,
                                 })) || null);
                             } catch (e) {
                                 console.error(`Exception in generate_aligned_coords (${e})`);
@@ -367,13 +375,14 @@ const Depiction = {
                     });
                     const rebuildStored = rebuild;
                     if (match) {
-                        useMolblockWedging = false;
                         rebuild = false;
                         straighten = false;
                         canonicalize = 0;
-                    } else if (optsLocal.RECOMPUTE2D) {
-                        useMolblockWedging = false;
-                        rebuild = true;
+                    } else {
+                        useMolBlockWedging = false;
+                        if (opts.RECOMPUTE2D) {
+                            rebuild = true;
+                        }
                     }
                     Object.assign(res, this.getNormPickle(mol, {
                         rebuild, useCoordGen, normalize, canonicalize, straighten
@@ -393,12 +402,8 @@ const Depiction = {
                     if (abbreviate) {
                         mol.condense_abbreviations();
                     }
-                    if (useMolblockWedging) {
-                        Object.assign(drawOpts, {
-                            useMolBlockWedging: true,
-                            wedgeBonds: false,
-                            addChiralHs: false,
-                        });
+                    if (useMolBlockWedging) {
+                        this.setMolblockWedgingDrawOpts(drawOpts);
                     }
                     [0, 1].some(() => {
                         const drawOptsText = JSON.stringify(drawOpts);
@@ -416,7 +421,7 @@ const Depiction = {
                     break;
                 }
                 }
-                Object.assign(res, { match, svg });
+                Object.assign(res, { match, svg, useMolBlockWedging });
             } finally {
                 mol.delete();
             }

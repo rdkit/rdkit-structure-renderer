@@ -1239,6 +1239,9 @@ const Renderer = {
             if (res.molblock === '') {
                 res.molblock = getMolblockFromMol(mol, molBlockParams);
             }
+            if (res.smiles === '' || res.inchi === '') {
+                mol.remove_hs_in_place();
+            }
             if (res.smiles === '') {
                 try {
                     res.smiles = mol.get_smiles();

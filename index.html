@@ -1481,15 +1481,24 @@
             Renderer.init(`${window.location}/public`, basename).then(r => r.updateMolDrawDivs());
         </script>
         -->
-        <script src="/dist/rdkit-structure-renderer-bundle.js"></script>
+        <script id="rendererBundle"></script>
         <script>
             var basename;
-            // Uncomment the following to prevent spawning any Web Workers
-            // window.RDKitStructureRenderer.getMaxConcurrency = () => 0;
-            // Uncomment the following to force using the asm.js version of RDKit_minimal
-            // basename = 'RDKit_minimal_plainJs';
+            var rendererBundle = document.getElementById('rendererBundle');
             var path = window.location.toString();
-            window.RDKitStructureRenderer.init(path.substring(0, path.lastIndexOf('/')) + '/public', basename).then(function(r) { r.updateMolDrawDivs() });
+            path = path.substring(0, path.lastIndexOf('/'));
+            if (typeof rendererBundle === 'object') {
+                rendererBundle.src = path + '/dist/rdkit-structure-renderer-bundle.js';
+                rendererBundle.onload = function() {
+                    // Uncomment the following to prevent spawning any Web Workers
+                    // window.RDKitStructureRenderer.getMaxConcurrency = () => 0;
+                    // Uncomment the following to force using the asm.js version of RDKit_minimal
+                    // basename = 'RDKit_minimal_legacy';
+                    window.RDKitStructureRenderer.init(path + '/public', basename).then(function(r) {
+                        r.updateMolDrawDivs();
+                    });
+                }
+            }
         </script>
     </body>
 </html>

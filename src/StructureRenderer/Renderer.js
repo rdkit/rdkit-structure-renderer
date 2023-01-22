@@ -405,27 +405,27 @@ const Renderer = {
      * once the latter is loaded and initialized
      */
     init(minimalLibPathIn, basenameIn) {
+        const takeParent = (path) => path.substring(0, path.lastIndexOf('/'));
         let basename = basenameIn;
         let minimalLibPath = minimalLibPathIn;
         if (!basename) {
             basename = getMinimalLibBasename();
             if (!haveWebAssembly) {
-                basename += '_plainJs';
+                basename += '_legacy';
             }
         }
         if (this.isRDKitReady()) {
             return Promise.resolve(this);
         }
         if (!this._minimalLibJs) {
-            let shouldTrim = false;
             if (typeof minimalLibPath !== 'string') {
                 minimalLibPath = document.currentScript?.src || '';
-                shouldTrim = true;
-            } else if (minimalLibPath.endsWith('/') || minimalLibPath.endsWith('.js')) {
-                shouldTrim = true;
             }
-            if (shouldTrim) {
-                minimalLibPath = minimalLibPath.substring(0, minimalLibPath.lastIndexOf('/'));
+            if (minimalLibPath.endsWith('/')) {
+                minimalLibPath = takeParent(minimalLibPath);
+            }
+            if (minimalLibPath.endsWith('.js')) {
+                minimalLibPath = takeParent(minimalLibPath);
             }
             this._minimalLibPath = minimalLibPath;
             this._minimalLibJs = `${this._minimalLibPath}/${basename}.${packageVersion}.js`;
@@ -433,7 +433,7 @@ const Renderer = {
                 const modulePaths = ['', ...module.paths];
                 if (!modulePaths.some((path) => {
                     try {
-                        minimalLibPath = (path ? `${path}/` : path) + this._minimalLibJs;
+                        minimalLibPath = `${path ? path + '/' : ''}${this._minimalLibJs}`;
                         // Using backticks avoids the following webpack warning:
                         // 'Critical dependency: the request of a dependency is an expression'
                         // eslint-disable-next-line import/no-dynamic-require, global-require

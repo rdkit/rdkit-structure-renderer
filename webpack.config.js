@@ -39,7 +39,12 @@ module.exports = () => {
 
     const moduleConfig = {
         ...config,
-        entry: "./pkg/dist-src/index.js",
+        entry: {
+            app: [
+                "core-js/stable",
+                "./pkg/dist-src/index.js"
+            ]
+        },
         experiments: {
             outputModule: true,
         },

@@ -58,10 +58,15 @@ const rdkitReady = initRDKitModule({
 const Depiction = {${Object.keys(Depiction).map((k) => `${k}: ${Depiction[k]}`).join(',')}};
 
 const main = (rdkitReady, dispatcherId) => {
+    let stereoSet = false;
     onmessage = ({ data }) => rdkitReady.then(rdkitModule => {
         const { wPort } = data;
         if (!wPort) {
             return;
+        }
+        if (!stereoSet) {
+            rdkitModule.use_legacy_stereo_perception(false);
+            stereoSet = true;
         }
         delete data.wPort;
         data.rdkitModule = rdkitModule;

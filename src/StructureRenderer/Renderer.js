@@ -397,8 +397,8 @@ const Renderer = {
     /**
      * Called to initialize the RDKitModule used by UI and load CSS
      * into the current HTML document. If the URL of the MinimalLib
-     * JS loader, MinimalLib will be loaded from there, otherwise
-     * it will be loaded from the default location.
+     * JS loader is provided, MinimalLib will be loaded from there,
+     * otherwise it will be loaded from the default location.
      * @param {string} minimalLibPath (optional) URL containing RDKit_minimal
      * @param {string} basename (optional) basename of the main library
      * @returns {Promise} Promise that resolves to the RDKit module
@@ -490,6 +490,7 @@ const Renderer = {
                         // _window.RDKitModule = _RDKitModule;
                         // uncomment to have the Renderer available in console for debugging
                         _window.RDKitStructureRenderer = this;
+                        _RDKitModule.use_legacy_stereo_perception(false);
                         console.log(`RDKit version: ${_RDKitModule.version()}`);
                         return this;
                     })();

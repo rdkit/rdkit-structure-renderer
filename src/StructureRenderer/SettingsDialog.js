@@ -30,9 +30,9 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-import { RDK_STR_RNR } from './constants.js';
-import ButtonTooltip from './ButtonTooltip.js';
-import { getElementCenter, getViewPortRect } from './utils.js';
+import { RDK_STR_RNR } from './constants';
+import ButtonTooltip from './ButtonTooltip';
+import { getElementCenter, getViewPortRect } from './utils';
 
 /**
  * SettingsDialog class:
@@ -94,12 +94,12 @@ class SettingsDialog {
         let item;
         // if there is an onCopyXXX function specific for format XXX,
         // call it, otherwise copy text from the respective TextArea
-        const onCopyFunc = this['onCopy' + field.toUpperCase()];
+        const onCopyFunc = this[`onCopy${field.toUpperCase()}`];
         if (onCopyFunc) {
             await onCopyFunc.call(this);
         } else {
             const molText = this.textArea[field].value;
-            const text = new Blob([molText], {type: 'text/plain'});
+            const text = new Blob([molText], { type: 'text/plain' });
             // eslint-disable-next-line no-undef
             item = new ClipboardItem({
                 'text/plain': text,
@@ -120,7 +120,7 @@ class SettingsDialog {
      * @returns {boolean} whether the checkbox is checked
      */
     fetchAndStoreBoolOpt(field) {
-        const isChecked = this.renderOpt[field].checked
+        const isChecked = this.renderOpt[field].checked;
         // remember the user setting for this field/div
         const key = this.renderer.getCacheKey(this.molDiv);
         this.renderer.updateUserOptCache(key, field, isChecked);
@@ -136,8 +136,9 @@ class SettingsDialog {
     enableCopyMolblock(shouldEnable) {
         const displaySpinner = shouldEnable ? 'none' : 'block';
         if (!shouldEnable) {
-            this.coordDependentCopyButtons.forEach(field =>
-                this.renderer.setButtonEnabled(this.copyFormat[field], false, true));
+            this.coordDependentCopyButtons.forEach(
+                (field) => this.renderer.setButtonEnabled(this.copyFormat[field], false, true)
+            );
             this.molblockSpinner.innerDiv = this.renderer.getSpinner(this.molblockSpinner.div);
             const wasExpanded = this.isExpanded.checked;
             this.isExpanded.checked = true;
@@ -166,8 +167,9 @@ class SettingsDialog {
                 this.molblockSpinner.innerDiv.style.display = displaySpinner;
                 this.molblockSpinner.innerDiv.remove();
                 this.molblockSpinner.innerDiv = null;
-                this.coordDependentCopyButtons.forEach(field =>
-                    this.renderer.setButtonEnabled(this.copyFormat[field], true, true));
+                this.coordDependentCopyButtons.forEach(
+                    (field) => this.renderer.setButtonEnabled(this.copyFormat[field], true, true)
+                );
             }
         }
     }
@@ -179,7 +181,7 @@ class SettingsDialog {
      */
     async onRenderingChanged(field) {
         const div = this.molDiv;
-        const divId = this.renderer.getDivId(div)
+        const divId = this.renderer.getDivId(div);
         const key = this.renderer.getCacheKey(div);
         const currentDiv = this.renderer.currentDivs().get(divId) || {};
         const isChecked = this.fetchAndStoreBoolOpt(field);
@@ -206,7 +208,9 @@ class SettingsDialog {
             // the upstream app that the user settings for this div have changed
             if (molblock) {
                 const { userOptsCallback } = currentDiv;
-                userOptsCallback && userOptsCallback(divId, field, isChecked, molblock);
+                if (userOptsCallback) {
+                    userOptsCallback(divId, field, isChecked, molblock);
+                }
             }
         } finally {
             func(true);
@@ -259,13 +263,13 @@ class SettingsDialog {
             if (text.includes('scaffold')) {
                 label.onmouseenter = (e) => {
                     this.showHideScaffoldTooltip(e);
-                }
+                };
                 label.onmouseleave = (e) => {
                     this.showHideScaffoldTooltip(e);
-                }
+                };
             }
             this.scaffoldTooltip = new ButtonTooltip(this.renderer);
-            ['box', 'mark'].forEach(className => {
+            ['box', 'mark'].forEach((className) => {
                 const span = document.createElement('span');
                 span.className = className;
                 label.appendChild(span);
@@ -277,7 +281,8 @@ class SettingsDialog {
         this.setPosition = this.setPosition.bind(this);
         this.hideOnClick = this.hideOnClick.bind(this);
         const textArea = Object.fromEntries(Array.from(this.dialog.querySelectorAll(
-            `textarea[id^=${RDK_STR_RNR}content-`)).map(elem => [this.getIdVariant(elem.id), elem]));
+            `textarea[id^=${RDK_STR_RNR}content-`
+        )).map((elem) => [this.getIdVariant(elem.id), elem]));
         const spinnerOuter = document.createElement('div');
         spinnerOuter.className = 'spinner';
         const spinner = document.createElement('div');
@@ -289,18 +294,26 @@ class SettingsDialog {
         this.textArea = textArea;
         this.copyFormat = {};
         this.dialog.querySelectorAll(`button[id^=${RDK_STR_RNR}copy-`).forEach(
-            button => {
+            (button) => {
                 button.appendChild(this.renderer.getButtonIcon('copy'));
                 const field = this.getIdVariant(button.id);
                 this.copyFormat[field] = button;
                 button.onclick = () => this.onCopy(field);
-            });
+            }
+        );
         const scaleInput = this.dialog.querySelector(`input[id^=${RDK_STR_RNR}scalefac`);
         if (scaleInput) {
-            scaleInput.onchange = (e) => this.renderer.copyImgScaleFac = e.target.value;
+            scaleInput.onchange = (e) => {
+                this.renderer.copyImgScaleFac = e.target.value;
+            };
         }
         this.dialog.querySelectorAll(`[id^=${RDK_STR_RNR}formats-]`).forEach(
-            elem => elem.onclick = () => this.isExpanded.checked = !this.isExpanded.checked);
+            (elem) => {
+                elem.onclick = () => {
+                    this.isExpanded.checked = !this.isExpanded.checked;
+                };
+            }
+        );
     }
 
     /**
@@ -308,7 +321,7 @@ class SettingsDialog {
      * @param {object} elem HTML Element that is to be disabled
      */
     disableAction(elem) {
-        [elem, elem.parentNode].forEach(item => item.setAttribute('disabled', 'disabled'));
+        [elem, elem.parentNode].forEach((item) => item.setAttribute('disabled', 'disabled'));
     }
 
     /**
@@ -316,7 +329,7 @@ class SettingsDialog {
      * @param {object} elem HTML Element that is to be enabled
      */
     enableAction(elem) {
-        [elem, elem.parentNode].forEach(item => item.removeAttribute('disabled'));
+        [elem, elem.parentNode].forEach((item) => item.removeAttribute('disabled'));
     }
 
     /**
@@ -384,8 +397,11 @@ class SettingsDialog {
     async setMolDiv(div) {
         this.molDiv = div;
         const key = this.renderer.getCacheKey(div);
-        this.renderer.getCheckableUserOpts().forEach(opt =>
-            this.renderOpt[opt.tag].checked = this.renderer.getDivOpt(div, opt.tag) || false);
+        this.renderer.getCheckableUserOpts().forEach(
+            (opt) => {
+                this.renderOpt[opt.tag].checked = this.renderer.getDivOpt(div, opt.tag) || false;
+            }
+        );
         this.enableScaffoldOpts(div);
         const relatedNodes = this.renderer.getRelatedNodes(div);
         const dialogRelatives = Object.fromEntries(
@@ -397,7 +413,8 @@ class SettingsDialog {
                     res = null;
                 }
                 return [k, res];
-            }));
+            })
+        );
         if (!dialogRelatives.scrollingNode) {
             dialogRelatives.scrollingNode = document;
         }
@@ -412,8 +429,10 @@ class SettingsDialog {
         });
         const userOpts = this.renderer.getUserOptsForDiv(div);
         const formats = await this.renderer.getChemFormatsFromPickle(
-            this.renderer.getCurrentMol(key).pickle, null, userOpts.USE_MOLBLOCK_WEDGING);
-        Object.entries(formats).forEach(([format, value]) => this.textArea[format].value = value);
+            this.renderer.getCurrentMol(key).pickle, null, userOpts);
+        Object.entries(formats).forEach(([format, value]) => {
+            this.textArea[format].value = value;
+        });
     }
 
     /**
@@ -423,8 +442,9 @@ class SettingsDialog {
      */
     setButtonsAlwaysVisible(alwaysVisible) {
         const attr = (alwaysVisible ? ' always-visible' : '');
-        Object.entries(this.buttons).forEach(([type, button]) =>
-            button.className = `button ${type}${attr}`);
+        Object.entries(this.buttons).forEach(([type, button]) => {
+            button.className = `button ${type}${attr}`;
+        });
     }
 
     /**
@@ -451,8 +471,8 @@ class SettingsDialog {
             }
             // ignore scrolling events from our textareas
             // and do nothing if we are not visible
-            if (!this.isVisible ||
-                (e.target && Object.values(this.textArea).includes(e.target))) {
+            if (!this.isVisible
+                || (e.target && Object.values(this.textArea).includes(e.target))) {
                 return;
             }
         }
@@ -520,7 +540,8 @@ class SettingsDialog {
             // the scrolling event as the dialog is already scrolling
             // together with the rest of the view and we do not need
             // to do anything
-            if (Math.abs(dialogDelta.x - cogDelta.x) < 2 && Math.abs(dialogDelta.y - cogDelta.y) < 2) {
+            if (Math.abs(dialogDelta.x - cogDelta.x) < 2
+                && Math.abs(dialogDelta.y - cogDelta.y) < 2) {
                 return;
             }
         }
@@ -528,7 +549,8 @@ class SettingsDialog {
         // has not scrolled as much as the cog button has, compute
         // the dialog position and set it
         const viewPortRect = getViewPortRect();
-        const beforeNodeRect = this.dialogRelatives.beforeNode?.getBoundingClientRect() || viewPortRect;
+        const beforeNodeRect = this.dialogRelatives.beforeNode?.getBoundingClientRect()
+            || viewPortRect;
         const topLeft = {
             x: cogCenter.x - this._initialDialogRect.x,
             y: cogCenter.y - this._initialDialogRect.y - this._initialDialogRect.height,
@@ -577,8 +599,8 @@ class SettingsDialog {
         const cogButtonRect = this.buttons.cog.getBoundingClientRect();
         // if this is a spurious event or the user clicked
         // near the cog button, do nothing
-        if (!cogButtonRect ||
-            (e.clientX > cogButtonRect.left - TOL && e.clientX < cogButtonRect.right + TOL
+        if (!cogButtonRect
+            || (e.clientX > cogButtonRect.left - TOL && e.clientX < cogButtonRect.right + TOL
                 && e.clientY > cogButtonRect.top - TOL && e.clientY < cogButtonRect.bottom + TOL)) {
             return;
         }
@@ -618,7 +640,7 @@ class SettingsDialog {
      */
     show() {
         // Couple SettingsDialog to the respective divId
-        const divId = this.renderer.getDivId(this.molDiv)
+        const divId = this.renderer.getDivId(this.molDiv);
         if (this.currentDivId !== null) {
             const currentDiv = this.renderer.currentDivs().get(divId) || {};
             currentDiv.dispatcherId = null;
@@ -628,7 +650,8 @@ class SettingsDialog {
         // add event listeners
         this.isVisible = true;
         window.addEventListener('resize', this.setPosition);
-        let { parentNode, beforeNode, scrollingNode } = this.dialogRelatives;
+        let { parentNode, beforeNode } = this.dialogRelatives;
+        const { scrollingNode } = this.dialogRelatives;
         scrollingNode.addEventListener('scroll', this.setPosition, true);
         this.clickNode.addEventListener('mousedown', this.hideOnClick);
         this.setButtonsAlwaysVisible(true);

@@ -31,7 +31,7 @@
 //
 
 const DEFAULT_DRAW_OPTS = {
-    'backgroundColour': [1, 1, 1, 1]
+    backgroundColour: [1, 1, 1, 1]
 };
 
 const DEFAULT_IMG_OPTS = {

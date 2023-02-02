@@ -34,21 +34,21 @@
  * Return the MinimalLib basename
  * @returns {string} MinimalLib basename
  */
-const getMinimalLibBasename = () => `RDKit_minimal`;
+const getMinimalLibBasename = () => 'RDKit_minimal';
 
 /**
  * Replace &#10; with CR.
  * @param {string} s input string
  * @returns {string} string with &#10; replaced by CR
  */
-const decodeNewline = s => s.replace(/&#10;/g, '\n');
+const decodeNewline = (s) => s.replace(/&#10;/g, '\n');
 
 /**
  * Replace CR with &#10;.
  * @param {string} s input string
  * @returns {string} string with CR replaced by &#10;
  */
-const encodeNewline = s => s.replace(/\n/g, '&#10;');
+const encodeNewline = (s) => s.replace(/\n/g, '&#10;');
 
 /**
  * Return true if the passed string is a pkl_base64
@@ -78,14 +78,14 @@ const dataAttr = (attr) => `data-${attr}`;
  * @param {string} k dashed prop name
  * @returns {string} camel-case prop name
  */
-const dashToCamelCase = k => k.replace(/-\w/g, m => m[1].toUpperCase());
+const dashToCamelCase = (k) => k.replace(/-\w/g, (m) => m[1].toUpperCase());
 
 /**
  * Convert camel-case prop name to dashed prop name
  * @param {string} k camel-case prop name
  * @returns {string} dashed prop name
  */
-const camelCaseToDash = k => k.replace(/[A-Z]/g, m => '-' + m[0].toLowerCase());
+const camelCaseToDash = (k) => k.replace(/[A-Z]/g, (m) => `-${m[0].toLowerCase()}`);
 
 /**
  * Convert uppercase, underscore-separated keys
@@ -93,7 +93,7 @@ const camelCaseToDash = k => k.replace(/[A-Z]/g, m => '-' + m[0].toLowerCase());
  * @param {string} k uppercase, underscore-separated key
  * @returns {string} lowercase, dash-separated tag
  */
- const keyToTag = k => k.toLowerCase().replace(/_/g, '-');
+const keyToTag = (k) => k.toLowerCase().replace(/_/g, '-');
 
 /**
  * Convert lowercase, dash-separated tags
@@ -101,7 +101,21 @@ const camelCaseToDash = k => k.replace(/[A-Z]/g, m => '-' + m[0].toLowerCase());
  * @param {string} t lowercase, dash-separated tag
  * @returns {string} uppercase, underscore-separated key
  */
- const tagToKey = t => t.toUpperCase().replace(/-/g, '_');
+const tagToKey = (t) => t.toUpperCase().replace(/-/g, '_');
+
+/**
+ * Add in place the drawing options needed to visualize
+ * wedging as encoded in the molblock rather than recomputing
+ * wedging with RDKit.
+ * @param {Object} drawOpts drawing options to be modified in place
+ */
+const setMolblockWedgingDrawOpts = (drawOpts) => {
+    Object.assign(drawOpts, {
+        useMolBlockWedging: true,
+        wedgeBonds: false,
+        addChiralHs: false,
+    });
+};
 
 /**
  * Converts a mol into its molblock representation.
@@ -121,7 +135,7 @@ const getMolblockFromMol = (mol, details) => {
         try {
             molblock = mol.get_aromatic_form();
         } catch {
-            console.error("Failed to convert mol to molblock");
+            console.error('Failed to convert mol to molblock');
             molblock = '';
         }
     }
@@ -133,20 +147,20 @@ const getMolblockFromMol = (mol, details) => {
  * @param {UInt8Array} molPickle pickled molecule as UInt8Array
  * @returns {JSMol} molecule or null in case of failure
  */
- const getMolFromUInt8Array = (rdkitModule, pickle) => {
+const getMolFromUInt8Array = (rdkitModule, pickle) => {
     let mol;
     try {
         mol = rdkitModule.get_mol_from_uint8array(pickle);
-    } catch(e) {
+    } catch (e) {
         console.error(`Failed to generate mol from pickle (${e})`);
     }
     if (mol && !mol.is_valid()) {
-        console.error(`Failed to generate valid mol from pickle`);
+        console.error('Failed to generate valid mol from pickle');
         mol.delete();
         mol = null;
     }
     return mol;
-}
+};
 
 /**
  * Extract pickle from a pkl_base64 string
@@ -154,7 +168,7 @@ const getMolblockFromMol = (mol, details) => {
  * @returns {Uint8Array} Uint8Array pickle
  */
 const extractBase64Pickle = (molText) => Uint8Array.from(
-    atob(molText.substring(4)), c => c.charCodeAt(0)
+    atob(molText.substring(4)), (c) => c.charCodeAt(0)
 );
 
 /**
@@ -166,23 +180,23 @@ const getPickleSafe = (mol) => {
     let pickle;
     try {
         pickle = mol.get_as_uint8array();
-    } catch(e) {
+    } catch (e) {
         console.error(`Failed to get pickle (${e})`);
         pickle = new Uint8Array();
     }
     return pickle;
 };
 
-const cssToText = (keyValueDict, indent) => {
-    const _indentBy = (indent) => Array(indent + 1).fill('    ').join('');
-    indent = indent || 0;
+const cssToText = (keyValueDict, indentIn) => {
+    const _indentBy = (i) => Array(i + 1).fill('    ').join('');
+    const indent = indentIn || 0;
     return Object.entries(keyValueDict).reduce(
         (prev, [cssKey, cssDict]) => prev + camelCaseToDash(cssKey) + ' {\n' +
         Object.entries(cssDict).reduce(
-            (prev, [k, v]) => prev + _indentBy(indent) +
+            (prev2, [k, v]) => prev2 + _indentBy(indent) +
             (typeof v === 'object' ?
-                cssToText({[k]: v}, indent + 1) :
-                camelCaseToDash(k) + ': ' + v.toString()  + ';\n'
+                cssToText({ [k]: v }, indent + 1) :
+                camelCaseToDash(k) + ': ' + v.toString() + ';\n'
             ), ''
         ) + _indentBy(indent - 1) + '}\n\n', ''
     ).trimEnd() + '\n';
@@ -199,7 +213,7 @@ const getElementCenter = (element) => {
         x: Math.round(elementRect.left + 0.5 * elementRect.width),
         y: Math.round(elementRect.top + 0.5 * elementRect.height),
     };
-}
+};
 
 /**
  * Get viewport width or height.
@@ -247,6 +261,7 @@ export {
     camelCaseToDash,
     keyToTag,
     tagToKey,
+    setMolblockWedgingDrawOpts,
     getMolblockFromMol,
     extractBase64Pickle,
     getMolFromUInt8Array,

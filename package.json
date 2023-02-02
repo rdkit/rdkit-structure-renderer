@@ -1,8 +1,8 @@
 {
     "name": "rdkit-structure-renderer",
-    "version": "1.1.12",
+    "version": "1.1.17",
     "description": "A JS library to render molecules as HTML5 Canvas or SVG using RDKit MinimalLib",
-    "main": "pkg/dist-src/index.js",
+    "main": "dist/rdkit-structure-renderer-module.js",
     "scripts": {
         "test": "echo \"Error: no test specified\" && exit 1",
         "build": "npx genversion --es6 --semi src/version.js && npm run build:pkg && npm run build:prod",
@@ -28,6 +28,9 @@
     ],
     "author": "Novartis Institutes for BioMedical Research",
     "license": "BSD-3-Clause",
+    "dependencies": {
+        "core-js": "^3.27.1"
+    },
     "devDependencies": {
         "@babel/core": "^7.17.5",
         "@babel/plugin-transform-runtime": "^7.17.0",
@@ -43,6 +46,9 @@
         "@webpack-cli/generators": "^2.4.2",
         "babel-loader": "^8",
         "eslint": "^8.10.0",
+        "eslint-config-airbnb": "^19.0.4",
+        "eslint-plugin-import": "^2.26.0",
+        "eslint-plugin-jsx-a11y": "^6.6.1",
         "eslint-webpack-plugin": "^3.1.1",
         "genversion": "^3.1.1",
         "html-webpack-plugin": "^5.5.0",
@@ -95,6 +101,7 @@
             "not op_mini all"
         ],
         "development": [
+            "ie 11",
             "last 1 chrome version",
             "last 1 firefox version",
             "last 1 safari version"

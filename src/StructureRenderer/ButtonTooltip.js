@@ -30,7 +30,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-import { getElementCenter, getViewPortRect } from "./utils.js";
+import { getElementCenter, getViewPortRect } from './utils';
 
 /**
  * ButtonTooltip class:
@@ -79,8 +79,8 @@ class ButtonTooltip {
      * Set the tooltip to be hidden (private).
      */
     _setHiddenClass() {
-        this._div.className = this._containerClass + ' hidden';
-        this._span.className = this._spanClass + ' hidden';
+        this._div.className = `${this._containerClass} hidden`;
+        this._span.className = `${this._spanClass} hidden`;
         this._isVisible = false;
     }
 
@@ -88,8 +88,8 @@ class ButtonTooltip {
      * Set the tooltip to be visible (private).
      */
     _setVisibleClass() {
-        this._div.className = this._containerClass + ' visible';
-        this._span.className = this._spanClass + ' visible';
+        this._div.className = `${this._containerClass} visible`;
+        this._span.className = `${this._spanClass} visible`;
         this._isVisible = true;
     }
 
@@ -132,8 +132,8 @@ class ButtonTooltip {
      * Set the tooltip position relative to parent.
      * @returns {boolean} true if success, false if failure
      */
-    setPosition(parent, offset) {
-        offset = offset || { x: 0, y: 0 };
+    setPosition(parent, offsetIn) {
+        const offset = offsetIn || { x: 0, y: 0 };
         const parentCenter = getElementCenter(parent);
         const viewPortRect = getViewPortRect();
         const height = this._height + this.getYOffset();
@@ -153,7 +153,7 @@ class ButtonTooltip {
         if (top < minTop) {
             top += height + this.getYOffset();
         }
-        this._div.style = `top: ${top}px; left: ${left}px`;
+        this._div.setAttribute('style', `top: ${top}px; left: ${left}px`);
         return true;
     }
 

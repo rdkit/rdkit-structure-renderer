@@ -33,7 +33,7 @@
 /**
  * Base class for managing a msg queue
  */
- class Queue {
+class Queue {
     constructor() {
         this._q = [];
     }
@@ -75,7 +75,7 @@
      */
     purge(msgDivId) {
         const shouldAbort = true;
-        this._q.forEach(qMsg => {
+        this._q.forEach((qMsg) => {
             if (msgDivId === qMsg.divId) {
                 if (qMsg.type && qMsg.qPort) {
                     qMsg.type = null;
@@ -94,7 +94,7 @@
      * is aborted before being submitted
      */
     submitWhenWorkerAvailable(msg) {
-        return new Promise(resolve => {
+        return new Promise((resolve) => {
             const msgChannel = new MessageChannel();
             msg.qPort = msgChannel.port2;
             msgChannel.port1.onmessage = ({ data }) => {
@@ -138,188 +138,4 @@
     }
 }
 
-/**
- * MainQueue class:
- * - maintains a queue of jobs
- * - maintains a key, value dictionary of childQueues which
- *   are tied to a specific divId when a job is submitted
- *   by the SettingsDialog
- * - submits jobs to the Scheduler if not busy
- */
- class MainQueue extends Queue {
-    constructor(scheduler, cleanupFunc) {
-        super();
-        this._scheduler = scheduler;
-        this._children = {};
-        this._cleanup = cleanupFunc;
-    }
-
-    /**
-     * Scheduler accessor.
-     * @returns {Scheduler} the Scheduler associated to this queue
-     */
-    scheduler() {
-        return this._scheduler;
-    }
-
-    /**
-     * In the MainQueue, a msg should be shifted
-     * from the queue immediately after being submitted
-     * to the Dispatcher, to allow further flushing.
-     * @returns {boolean} always true
-     */
-    shouldFlush() {
-        this._q.shift();
-        return true;
-    }
-
-    /**
-     * Assign a new ChildQueue to this divId.
-     * @param {string} divId
-     * @returns {Object} the ChildQueue assigned to this divId.
-     */
-    addChild(divId) {
-        const childQueue = new ChildQueue(this, divId);
-        this._children[divId] = childQueue;
-        return childQueue;
-    }
-
-    /**
-     * Remove the ChildQueue assigned to this divId.
-     * @param {string} divId
-     */
-    removeChild(divId) {
-        delete this._children[divId];
-    }
-
-    /**
-     * Returns the array of children queues associated
-     * to this MainQueue.
-     * @returns {Array<ChildQueue>} an array of ChildQueue
-     */
-    children() {
-        return Object.values(this._children);
-    }
-
-    /**
-     * Loops through the {divId: ChildQueue} dictionary and removes
-     * empty entries; quits the loop at the first non-empty entry.
-     */
-    removeEmptyChildren() {
-        Object.entries(this._children).every(([divId, child]) => {
-            const isEmpty = child.isEmpty();
-            if (isEmpty) {
-                this.removeChild(divId);
-                this._cleanup && this._cleanup(divId);
-            }
-            return isEmpty;
-        });
-    }
-
-    /**
-     * Submit a job to this MainQueue.
-     * @param  {Object} msg the msg describing the job
-     * @returns {Promise} a Promise that will resolve to the
-     * result when the job is completed, or to null is the job
-     * is aborted before being submitted
-     */
-    submit(msg) {
-        const res = this.submitWhenWorkerAvailable(msg);
-        this._q.push(msg);
-        this.flush();
-        return res;
-    }
-
-    /**
-     * Abort jobs connected to divId, whether they are
-     * in the main queue or in any child queue
-     * @param {string} divId jobs connected with this
-     * identifier will be aborted
-     */
-    abortJobs(divId) {
-        this.purge(divId);
-        this.children().forEach(child => child.purge(divId));
-        this.removeEmptyChildren(this._cleanup);
-    }
-}
-
-/**
- * ChildQueue class:
- * - maintains a queue of jobs that depend on results previously
- *   submitted to the same ChildQueue
- * - submits jobs to the Scheduler if not busy
- */
- class ChildQueue extends Queue {
-    constructor(mainQueue, divId) {
-        super();
-        this._mainQueue = mainQueue;
-        this.divId = divId;
-    }
-
-    /**
-     * Scheduler accessor.
-     * @returns {Scheduler} the Scheduler associated to this queue
-     */
-    scheduler() {
-        return this._mainQueue.scheduler();
-    }
-
-    /**
-     * In a ChildQueue, a msg should be shifted from
-     * the queue only after it has been completed by the
-     * Dispatcher, and no more flushing should occur.
-     * @returns always false
-     */
-    shouldFlush() {
-        return false;
-    }
-
-    /**
-     * Create a hash to identify a msg. The hash is a pipe-separated string:
-     * msgDivId|msgType|msgMolText
-     * @param {Object} msg the msg for which a hash is to be computed
-     * @returns {string} the computed hash
-     */
-    computeHash(msg) {
-        let hash = msg.divId + '|' + msg.type + '|' + msg.molText;
-        if (msg.scaffoldText) {
-            hash += '|' + msg.scaffoldText;
-        }
-        if (msg.opts) {
-            hash += '|' + Object.keys(msg.opts).sort().map(k => msg[k]).join('|');
-        }
-        return hash;
-    }
-
-    /**
-     * Submit a job to this ChildQueue.
-     * @param  {Object} msg the msg describing the job
-     * @returns {Promise} a Promise that will resolve to the
-     * result when the job is completed, or to null is the job
-     * is aborted before being submitted
-     */
-    submit(msg) {
-        const res = this.submitWhenWorkerAvailable(msg);
-        this._q.push(msg);
-        const hash = this.computeHash(msg);
-        const lastIdx = this._q.length - 1;
-        let shouldAbort = false;
-        this._q.forEach((qMsg, i) => {
-            if (qMsg.type) {
-                if (shouldAbort) {
-                    qMsg.type = null;
-                    qMsg.qPort.postMessage({ shouldAbort });
-                    qMsg.qPort.close();
-                } else if (i !== lastIdx && this.computeHash(qMsg) === hash) {
-                    shouldAbort = true;
-                }
-            }
-        });
-        if (!shouldAbort && this._q.length === 1) {
-            this.flush();
-        }
-        return res;
-    }
-}
-
-export { Queue, MainQueue, ChildQueue };
+export default Queue;

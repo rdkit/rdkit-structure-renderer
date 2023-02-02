@@ -30,7 +30,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-import Renderer from './StructureRenderer/Renderer.js';
+import Renderer from './StructureRenderer/Renderer';
 
 export { Renderer };
 export default Renderer;

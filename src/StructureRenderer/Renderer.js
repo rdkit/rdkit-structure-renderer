@@ -716,7 +716,7 @@ const Renderer = {
      * Request mol pickle for a given divId.
      * @param {string} divId id of the div le molecule belongs to
      * @param {string} molText molecule description (SMILES, molblock or pkl_base64)
-     * @param {string} scaffoldText scaffold description (SMILES, molblock or pkl_base64).
+     * @param {string|null} scaffoldText scaffold description (SMILES, molblock or pkl_base64).
      * Note that the description may include multiple scaffolds, either separated by
      * a pipe symbol ('|', SMILES and pkl_base64) or by the SDF terminator ('$$$$', molblock).
      * @param {object} opts rendering options
@@ -1017,19 +1017,20 @@ const Renderer = {
      * Request mol pickle for a given divId.
      * @param {string} divId id of the div le molecule belongs to
      * @param {string} molText molecule description (SMILES, molblock or pkl_base64)
-     * @param {string} scaffoldText scaffold description (SMILES, molblock or pkl_base64).
+     * @param {string|null} scaffoldText scaffold description (SMILES, molblock or pkl_base64).
      * Note that the description may include multiple scaffolds, either separated by
      * a pipe symbol ('|', SMILES and pkl_base64) or by the SDF terminator ('$$$$', molblock).
-     * @param {object} opts rendering options
+     * @param {object} userOptsIn rendering options
      * @returns {Promise} a Promise that will resolve to an object
      * containing the mol pickle (and possibly other results depending on
      * the job type), or to null if the job is aborted before being submitted
      */
-    async getPickledMolAndMatch(divId, molText, scaffoldText, userOpts) {
+    async getPickledMolAndMatch(divId, molText, scaffoldText, userOptsIn) {
         const promArray = [];
         let res = null;
         // if the user wants to align to a scaffoldText or highlight
         // the scaffoldText, we need an aligned layout + matches
+        const userOpts = userOptsIn || {};
         if (userOpts.SCAFFOLD_ALIGN || userOpts.SCAFFOLD_HIGHLIGHT) {
             promArray.push(this.requestMolPickle(divId, molText, scaffoldText, userOpts));
         }
@@ -1455,6 +1456,47 @@ const Renderer = {
         } else {
             console.error('Canvas is not available on this platform');
         }
+        return image;
+    },
+
+    /**
+     * Get an image with the 2D structure associated to the passed molText.
+     * @param {string} molText molecule description (SMILES, molblock or pkl_base64)
+     * @param {string|null} scaffoldText scaffold description (SMILES, molblock or pkl_base64).
+     * Note that the description may include multiple scaffolds, either separated by
+     * a pipe symbol ('|', SMILES and pkl_base64) or by the SDF terminator ('$$$$', molblock).
+     * @param {object} opts optional dictionary with drawing options:
+     * - format: 'png', 'base64png' or 'svg', defaults to 'png'
+     * - transparent: transparent background, defaults to true
+     * - width: image width, defaults to the current div width (if any)
+     * - height: image height, defaults to the current div height (if any)
+     * - scaleFac: image scale factor, defaults to the current scale factor
+     * - match: match object, defaults to the current div match
+     * - userOpts: user settings, defaults to the current div settings
+     * - drawOpts: RDKit drawOpts, defaults to the current div drawOpts
+     * @returns {string|Blob} a string if format is either 'svg' or 'base64png',
+     * otherwise a Blob
+     */
+    async getImageFromMolText(molText, scaffoldText, opts) {
+        const uniqueId = crypto.randomUUID();
+        let { userOpts, drawOpts } = (opts || {});
+        userOpts = userOpts || {};
+        drawOpts = drawOpts || {};
+        const res = await this.getPickledMolAndMatch(uniqueId, molText, scaffoldText, userOpts);
+        const { pickle, match, useMolBlockWedging } = res;
+        if (!pickle) {
+            return null;
+        }
+        if (userOpts.SCAFFOLD_HIGHLIGHT && match) {
+            Object.assign(drawOpts, match);
+        } else if (!userOpts.SCAFFOLD_HIGHLIGHT) {
+            delete drawOpts.atoms;
+            delete drawOpts.bonds;
+        }
+        userOpts.USE_MOLBLOCK_WEDGING = useMolBlockWedging;
+        const mol = await this.getMolFromPickle(pickle);
+        Object.assign(opts, { userOpts, drawOpts });
+        const image = await this.getImageFromMol(mol, opts);
         return image;
     },
 

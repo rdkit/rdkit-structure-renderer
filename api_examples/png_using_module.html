@@ -5,17 +5,6 @@
         <title>StructureRenderer API example - generate PNG using module</title>
     </head>
     <body>
-        <!-- Uncomment to load as module
-        <script type="module">
-            import Renderer from "/dist/rdkit-structure-renderer-module.js";
-            let basename;
-            // Uncomment the following to prevent spawning any Web Workers
-            // Renderer.getMaxConcurrency = () => 0;
-            // Uncomment the following to force using the asm.js version of RDKit_minimal
-            // basename = 'RDKit_minimal_legacy';
-            Renderer.init(`${window.location}/public`, basename).then(r => r.updateMolDrawDivs());
-        </script>
-        -->
         <div id="molPng"></div>
         <script id="rendererModule" type="module"></script>
         <script type="module">

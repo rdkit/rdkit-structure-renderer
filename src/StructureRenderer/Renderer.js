@@ -30,6 +30,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
+import { v4 as uuidv4 } from 'uuid';
 import defaultRendererCss from './style';
 import defaultDialogHtml from './dialog';
 import defaultIcons from './icons';
@@ -1478,7 +1479,7 @@ const Renderer = {
      * otherwise a Blob
      */
     async getImageFromMolText(molText, scaffoldText, opts) {
-        const uniqueId = crypto.randomUUID();
+        const uniqueId = uuidv4();
         let { userOpts, drawOpts } = (opts || {});
         userOpts = userOpts || {};
         drawOpts = drawOpts || {};

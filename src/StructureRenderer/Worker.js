@@ -5,7 +5,6 @@ import {
     isBase64Pickle,
     isMolBlock,
     splitScaffoldText,
-    setMolblockWedgingDrawOpts,
 } from './utils';
 
 const Depiction = {
@@ -15,7 +14,6 @@ const Depiction = {
     isBase64Pickle,
     isMolBlock,
     splitScaffoldText,
-    setMolblockWedgingDrawOpts,
 
     /**
      * Generate molecule from SMILES, CTAB or pkl_base64.
@@ -151,27 +149,27 @@ const Depiction = {
      * }
      */
     getNormPickle(mol, {
-        rebuildIn, useCoordGen, normalize, canonicalize, straighten
+        rebuild, useCoordGen, normalize, canonicalize, straighten
     }) {
         let pickle = '';
         let hasCoords = mol.has_coords();
         const scaleFac = (normalize ? -1.0 : 1.0);
-        let rebuild = rebuildIn || !hasCoords;
-        if (rebuild || mol.normalize_depiction(canonicalize, scaleFac) < 0.0) {
-            rebuild = true;
+        let rebuildLocal = rebuild || !hasCoords;
+        if (rebuildLocal || mol.normalize_depiction(canonicalize, scaleFac) < 0.0) {
+            rebuildLocal = true;
             hasCoords = this.setNewCoords(mol, useCoordGen);
         }
         if (hasCoords) {
-            if (rebuild) {
+            if (rebuildLocal) {
                 mol.normalize_depiction(canonicalize, scaleFac);
             }
             if (straighten) {
-                const minimizeRotation = !rebuild && !canonicalize;
+                const minimizeRotation = !rebuildLocal && !canonicalize;
                 mol.straighten_depiction(minimizeRotation);
             }
             pickle = this.getPickleSafe(mol);
         }
-        return { pickle, rebuild };
+        return { pickle, rebuildLocal };
     },
 
     get({
@@ -401,9 +399,6 @@ const Depiction = {
                 case 's': {
                     if (abbreviate) {
                         mol.condense_abbreviations();
-                    }
-                    if (useMolBlockWedging) {
-                        this.setMolblockWedgingDrawOpts(drawOpts);
                     }
                     [0, 1].some(() => {
                         const drawOptsText = JSON.stringify(drawOpts);

@@ -48,7 +48,6 @@ import {
     getMolblockFromMol,
     getMolFromUInt8Array,
     keyToTag,
-    setMolblockWedgingDrawOpts,
 } from './utils';
 import {
     DEFAULT_IMG_OPTS,
@@ -966,9 +965,9 @@ const Renderer = {
      * molDraw (either canvas or SVG div) using drawing options
      * specified in drawOpts. In case of failure it will try
      * again with kekulization switched off before giving up.
-     * @param {JSMol|string} mol RDKitJS molecule or SVG string
-     * @param {object} drawOpts dictionary with drawing options
-     * @param {Element} molDraw optional; HTML Element (either canvas or SVG div)
+     * @param {JSMol|string} molIn RDKitJS molecule or SVG string
+     * @param {object} drawOptsIn dictionary with drawing options
+     * @param {Element} molDrawIn optional; HTML Element (either canvas or SVG div)
      * @@returns {string} result of the drawing call or null if failure
      */
     write2DLayout(molIn, drawOptsIn, molDrawIn) {
@@ -1062,6 +1061,56 @@ const Renderer = {
     },
 
     /**
+     * Override drawOpts where relevant, i.e. in relation to the
+     * value of specific userOpts, match, width, height, scaleFac,
+     * transparency.
+     * @param {Object|null} drawOpts input drawing options
+     * @param {Object|null} userOpts user options
+     * @param {Object|null} match match object
+     * @param {number|null} width image width
+     * @param {number|null} height image height
+     * @param {number|null} scaleFac image scaling factor
+     * @param {boolean|null} transparent whether background should be transparent
+     */
+    overrideDrawOpts({
+        drawOpts, userOpts, match, width, height, scaleFac, transparent
+    }) {
+        userOpts = userOpts || {};
+        width = width || DEFAULT_IMG_OPTS.width;
+        height = height || DEFAULT_IMG_OPTS.height;
+        scaleFac = scaleFac || this.copyImgScaleFac || DEFAULT_IMG_OPTS.scaleFac;
+        match = match || {};
+        transparent = transparent || typeof transparent === 'undefined';
+        drawOpts = { ...this.getDefaultDrawOpts(), ...(drawOpts || {}) };
+        if (userOpts.USE_MOLBLOCK_WEDGING) {
+            Object.assign(drawOpts, {
+                useMolBlockWedging: true,
+                wedgeBonds: false,
+                addChiralHs: false,
+            });
+        }
+        if (userOpts.SCAFFOLD_HIGHLIGHT && match) {
+            Object.assign(drawOpts, match);
+        } else {
+            delete drawOpts.atoms;
+            delete drawOpts.bonds;
+        }
+        drawOpts.addAtomIndices = userOpts.ATOM_IDX || false;
+        if (drawOpts.fixedBondLength) {
+            drawOpts.fixedBondLength *= scaleFac;
+        }
+        drawOpts.width = Math.round(width * scaleFac);
+        drawOpts.height = Math.round(height * scaleFac);
+        if (!drawOpts.backgroundColour) {
+            drawOpts.backgroundColour = [1, 1, 1, 1];
+        }
+        if (transparent) {
+            drawOpts.backgroundColour[3] = 0;
+        }
+        return drawOpts;
+    },
+
+    /**
      * Update the molecule visualized in div.
      * A spinning wheel is displayed until the new layout
      * is ready.
@@ -1084,34 +1133,19 @@ const Renderer = {
             // get the HTML element where we are going to draw
             const molDraw = this.getMolDraw(div);
             const userOpts = this.getUserOptsForDiv(div);
-            const drawOpts = this.getDrawOpts(div);
-            const getOrigWedgingOpts = (drawOptsIn) => {
-                const { useMolBlockWedging, wedgeBonds, addChiralHs } = drawOptsIn;
-                return { useMolBlockWedging, wedgeBonds, addChiralHs };
-            };
-            const origWedgingOpts = getOrigWedgingOpts(drawOpts);
-            let useMolBlockWedging = (
-                typeof userOpts.USE_MOLBLOCK_WEDGING === 'undefined' || userOpts.USE_MOLBLOCK_WEDGING
-            );
-            if (useMolBlockWedging) {
-                setMolblockWedgingDrawOpts(drawOpts);
-            }
-            drawOpts.addAtomIndices = userOpts.ATOM_IDX;
-            drawOpts.width = width;
-            drawOpts.height = height;
+            let drawOpts = this.getDrawOpts(div);
             const key = this.getCacheKey(div);
             let res = this.getCurrentMol(key);
             const scaffoldText = this.getScaffold(div);
             const divId = this.getDivId(div);
             if (!res) {
                 const molText = this.getMol(div);
-                res = await this.getPickledMolAndMatch(divId, molText, scaffoldText, {
-                    drawOpts,
-                    ...userOpts,
-                }) || {};
+                res = await this.getPickledMolAndMatch(divId, molText, scaffoldText, userOpts) || {};
             }
-            const { pickle, match, rebuild } = res;
-            useMolBlockWedging = res.useMolBlockWedging;
+            const {
+                pickle, match, rebuild, useMolBlockWedging
+            } = res;
+            userOpts.USE_MOLBLOCK_WEDGING = useMolBlockWedging || false;
             if (pickle) {
                 this.setCurrentMol(key, pickle, match);
                 if (userOpts.SCAFFOLD_ALIGN || userOpts.SCAFFOLD_HIGHLIGHT) {
@@ -1126,22 +1160,9 @@ const Renderer = {
                 } else {
                     this.clearWasRebuilt(key);
                 }
-                if (userOpts.SCAFFOLD_HIGHLIGHT && match) {
-                    Object.assign(drawOpts, match);
-                } else if (!userOpts.SCAFFOLD_HIGHLIGHT) {
-                    delete drawOpts.atoms;
-                    delete drawOpts.bonds;
-                }
-                if (!useMolBlockWedging) {
-                    Object.entries(origWedgingOpts).forEach(([k, v]) => {
-                        if (typeof v === 'undefined') {
-                            delete drawOpts[k];
-                        } else {
-                            drawOpts[k] = v;
-                        }
-                    });
-                    userOpts.USE_MOLBLOCK_WEDGING = false;
-                }
+                drawOpts = this.overrideDrawOpts({
+                    drawOpts, userOpts, match, width, height
+                });
                 const useSvg = (molDraw?.nodeName === 'DIV');
                 if (useSvg) {
                     const svgRes = await this.requestSvg(divId, pickle, { drawOpts, ...userOpts });
@@ -1395,43 +1416,14 @@ const Renderer = {
         if (!mol) {
             return null;
         }
-        let {
-            width,
-            height,
-            scaleFac,
-            match,
-            transparent,
-            userOpts,
-            drawOpts
-        } = opts;
-        const { format } = opts;
-        let image = null;
-        width = width || DEFAULT_IMG_OPTS.width;
-        height = height || DEFAULT_IMG_OPTS.height;
-        scaleFac = scaleFac || this.copyImgScaleFac || DEFAULT_IMG_OPTS.scaleFac;
-        match = match || {};
-        transparent = transparent || typeof transparent === 'undefined';
-        userOpts = userOpts || {};
-        drawOpts = { ...this.getDefaultDrawOpts(), ...(drawOpts || {}) };
+        const { format, userOpts } = opts;
         const isSvg = (format === 'svg');
         const isBase64Png = (format === 'base64png');
-        if (userOpts.ABBREVIATE) {
+        let image = null;
+        if (userOpts?.ABBREVIATE) {
             mol.condense_abbreviations();
         }
-        if (userOpts.SCAFFOLD_HIGHLIGHT) {
-            Object.assign(drawOpts, match);
-        } else {
-            delete drawOpts.atoms;
-            delete drawOpts.bonds;
-        }
-        drawOpts.addAtomIndices = userOpts.ATOM_IDX || false;
-        drawOpts.fixedBondLength *= scaleFac;
-        drawOpts.width = Math.round(width) * scaleFac;
-        drawOpts.height = Math.round(height) * scaleFac;
-        drawOpts.backgroundColour = drawOpts.backgroundColour || [1, 1, 1, 1];
-        if (transparent) {
-            drawOpts.backgroundColour[3] = 0;
-        }
+        const drawOpts = this.overrideDrawOpts(opts);
         if (isSvg) {
             try {
                 image = this.write2DLayout(mol, drawOpts);
@@ -1480,24 +1472,24 @@ const Renderer = {
      */
     async getImageFromMolText(molText, scaffoldText, opts) {
         const uniqueId = uuidv4();
-        let { userOpts, drawOpts } = (opts || {});
+        let { userOpts } = opts;
         userOpts = userOpts || {};
-        drawOpts = drawOpts || {};
-        const res = await this.getPickledMolAndMatch(uniqueId, molText, scaffoldText, userOpts);
+        const res = await this.getPickledMolAndMatch(uniqueId, molText, scaffoldText, userOpts) || {};
         const { pickle, match, useMolBlockWedging } = res;
         if (!pickle) {
             return null;
         }
-        if (userOpts.SCAFFOLD_HIGHLIGHT && match) {
-            Object.assign(drawOpts, match);
-        } else if (!userOpts.SCAFFOLD_HIGHLIGHT) {
-            delete drawOpts.atoms;
-            delete drawOpts.bonds;
+        userOpts.USE_MOLBLOCK_WEDGING = useMolBlockWedging || false;
+        Object.assign(opts, { userOpts, match });
+        let image = null;
+        if (opts.format === 'svg') {
+            const drawOpts = this.overrideDrawOpts(opts);
+            const svgRes = await this.requestSvg(uniqueId, pickle, { drawOpts, ...userOpts });
+            image = svgRes?.svg;
+        } else {
+            const mol = await this.getMolFromPickle(pickle);
+            image = await this.getImageFromMol(mol, opts);
         }
-        userOpts.USE_MOLBLOCK_WEDGING = useMolBlockWedging;
-        const mol = await this.getMolFromPickle(pickle);
-        Object.assign(opts, { userOpts, drawOpts });
-        const image = await this.getImageFromMol(mol, opts);
         return image;
     },
 

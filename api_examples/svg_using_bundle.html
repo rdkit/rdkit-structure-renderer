@@ -72,18 +72,18 @@
 M  END`;
             const unpkgRendererBundle = 'https://unpkg.com/rdkit-structure-renderer/dist/rdkit-structure-renderer-bundle.js';
             const unpkgMinimalLibPath = 'https://unpkg.com/rdkit-structure-renderer/public';
+            const numWebWorkers = 1;
             const rendererBundle = document.getElementById('rendererBundle');
             if (typeof rendererBundle === 'object') {
                 rendererBundle.src = unpkgRendererBundle;
                 rendererBundle.onload = function() {
                     const renderer = window.RDKitStructureRenderer;
                     renderer.getDefaultDrawOpts = () => defaultDrawOpts;
-                    // The following requests a single Web Worker
+                    // The following requests numWebWorkers Workers
                     // If no specific request is made, by default as many Web Workers
                     // as available CPU cores - 2, capped to a maximum of 8, are spawned
-                    renderer.getMaxConcurrency = () => 1;
-                    // Uncomment the following to force using the asm.js version of RDKit_minimal
-                    // basename = 'RDKit_minimal_legacy';
+                    // if set to 0, all renderings take place in the main UI thread
+                    renderer.getMaxConcurrency = () => numWebWorkers;
                     renderer.init(unpkgMinimalLibPath).then(function(r) {
                         r.getImageFromMolText(molText, scaffoldText, opts).then(image => {
                             if (image) {

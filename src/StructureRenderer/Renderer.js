@@ -1,4 +1,4 @@
-// Copyright (c) 2022, Novartis Institutes for BioMedical Research
+// Copyright (c) 2022-2023, Novartis Institutes for BioMedical Research
 //
 // All rights reserved.
 //
@@ -70,7 +70,6 @@ const _window = (haveWindow ? window : {
     devicePixelRatio: 1,
 });
 const haveWorker = (typeof Worker !== 'undefined');
-const isIE11 = (!window.ActiveXObject && 'ActiveXObject' in window);
 const haveWebAssembly = (() => {
     try {
         if (typeof WebAssembly === 'object'
@@ -89,6 +88,11 @@ const haveWebAssembly = (() => {
 })();
 
 const Renderer = {
+    /**
+     * Override to change, by default returns true on IE11.
+     * @returns {boolean} whether this is running on a legacy browser
+     */
+    getIsLegacyBrowser: () => !window.ActiveXObject && 'ActiveXObject' in window,
     /**
      * Override to change, currently hardware concurrency minus 2.
      * @returns {number} Hardware concurrency
@@ -1080,7 +1084,9 @@ const Renderer = {
         height = height || DEFAULT_IMG_OPTS.height;
         scaleFac = scaleFac || this.copyImgScaleFac || DEFAULT_IMG_OPTS.scaleFac;
         match = match || {};
-        transparent = transparent || typeof transparent === 'undefined';
+        if (typeof transparent === 'undefined') {
+            transparent = !this.getIsLegacyBrowser();
+        }
         drawOpts = { ...this.getDefaultDrawOpts(), ...(drawOpts || {}) };
         if (userOpts.USE_MOLBLOCK_WEDGING) {
             Object.assign(drawOpts, {
@@ -1125,6 +1131,7 @@ const Renderer = {
         // if the div has 0 size, do nothing, as it may have
         // already been unmounted
         const { width, height } = this.getRoundedDivSize(div);
+        const transparent = false;
         // get a spinner wheel with a radius appropriate
         // to the size of div
         const spinner = this.getSpinner(div);
@@ -1161,7 +1168,7 @@ const Renderer = {
                     this.clearWasRebuilt(key);
                 }
                 drawOpts = this.overrideDrawOpts({
-                    drawOpts, userOpts, match, width, height
+                    drawOpts, userOpts, match, width, height, transparent
                 });
                 const useSvg = (molDraw?.nodeName === 'DIV');
                 if (useSvg) {
@@ -2095,7 +2102,7 @@ const Renderer = {
         this.currentDivs().set(divId, divAttrs);
         this.getButtonTypes().forEach(({ type, tooltip }) => {
             let button = this.getButton(div, type);
-            const shouldHide = isIE11 || this.toBool(divAttrs[`hide-${type}`]);
+            const shouldHide = this.getIsLegacyBrowser() || this.toBool(divAttrs[`hide-${type}`]);
             if (!shouldHide && !button) {
                 button = this.createButton(type);
                 if (tooltip) {

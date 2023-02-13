@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8" />
+        <title>StructureRenderer PhantomJS example - generate SVG using bundle</title>
+        <style>
+            table {
+                font-family: Arial, Helvetica, sans-serif;
+            }
+        </style>
+    </head>
+    <body>
+        <div>
+            <table style="width: 100%;">
+                <tbody>
+                    <tr>
+                        <td style="margin: 5px 10px;">
+                            <div id="rdk-str-rnr-mol-1"></div>
+                        </td>
+                        <td style="margin: 5px 10px;">
+                            <div><b>SMILES:</b></div>
+                            <div style="word-break: break-all" id="smiles-string-1">&nbsp;</div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <script>
+            var unpkgRendererBundle = 'https://unpkg.com/rdkit-structure-renderer/dist/rdkit-structure-renderer-bundle.js';
+            var unpkgMinimalLibPath = 'https://unpkg.com/rdkit-structure-renderer/public';
+            var basename = 'RDKit_minimal_legacy';
+            var onRendererLoaded = function() {
+                var defaultDrawOpts = {
+                    bondLineWidth: 0.7,
+                    multipleBondOffset: 0.25,
+                    baseFontSize: 1.0,
+                    minFontSize: -1,
+                    maxFontSize: -1,
+                    annotationFontScale: 0.7,
+                    highlightBondWidthMultiplier: 20,
+                    dummyIsotopeLabels: false,
+                    atomColourPalette: {
+                        0: [0.1, 0.1, 0.1],
+                        1: [0.0, 0.0, 0.0],
+                        6: [0.0, 0.0, 0.0],
+                        7: [0.0, 0.0, 1.0],
+                        8: [1.0, 0.0, 0.0],
+                        9: [0.0, 0.498, 0.0],
+                        15: [0.498, 0.0, 0.498],
+                        16: [0.498, 0.247, 0.0],
+                        17: [0.0, 0.498, 0.0],
+                        35: [0.0, 0.498, 0.0],
+                        53: [0.247, 0.0, 0.498],
+                    },
+                    backgroundColour: [1, 1, 1, 1],
+                };
+                var renderer = window.RDKitStructureRenderer;
+                if (typeof renderer === 'object' && typeof renderer.init === 'function') {
+                    if (typeof renderer.getDefaultDrawOpts === 'function') {
+                        renderer.getDefaultDrawOpts = function() { return defaultDrawOpts; };
+                    }
+                    // The following requests not to spawn Web Workers (unsupported on legacy browsers)
+                    if (typeof renderer.getMaxConcurrency === 'function') {
+                        renderer.getMaxConcurrency = function() { return 0; };
+                    }
+                    if (typeof renderer.getIsLegacyBrowser === 'function') {
+                        renderer.getIsLegacyBrowser = function() { return true; };
+                    }
+                    var rendererPromise = renderer.init(unpkgMinimalLibPath, basename);
+                }
+            };
+            var renderer = function() {
+                if (!document.head.querySelector('script[id=rendererLoad]')) {
+                    var rendererBundle = document.createElement('script');
+                    rendererBundle.id = "rendererLoad";
+                    rendererBundle.src = unpkgRendererBundle;
+                    rendererBundle.onload = onRendererLoaded;
+                    if (typeof document.head === 'object') {
+                        document.head.appendChild(rendererBundle);
+                    }
+                }
+                return {
+                    then: function(callback) {
+                        if (typeof this.callback === 'undefined') {
+                            this.callback = callback;
+                        }
+                        if (window.RDKitStructureRenderer) {
+                            if (this.intervalId) {
+                                clearInterval(this.intervalId);
+                                this.intervalId = null;
+                            }
+                            this.callback(window.RDKitStructureRenderer);
+                        } else if (typeof this.intervalId === 'undefined' && typeof this.then.bind === 'function') {
+                            this.intervalId = setInterval(this.then.bind(this), 1000);
+                        }
+                    }
+                };
+            };
+            var renderSmiles = function(uniqueId, smiles, width, height) {
+                var divId = 'rdk-str-rnr-mol-' + uniqueId;
+                var smilesStructureDiv = document.getElementById(divId);
+                if (smilesStructureDiv) {
+                    smilesStructureDiv.setAttribute('class', 'rdk-str-rnr-mol-container');
+                    smilesStructureDiv.setAttribute('style', 'width: ' + width + 'px; height: ' + height + 'px;');
+                    smilesStructureDiv.setAttribute('data-mol', smiles);
+                    smilesStructureDiv.setAttribute('data-use-svg', '');
+                    renderer().then(function(r) {
+                        r.updateMolDrawDivIfNeeded(uniqueId);
+                    });
+                }
+                var smilesStringId = 'smiles-string-' + uniqueId;
+                var smilesStringDiv = document.getElementById(smilesStringId);
+                if (smilesStringDiv) {
+                    smilesStringDiv.innerHTML = smiles;
+                }
+            }
+
+            var uniqueId = '1';
+            var smiles = 'O=C(O)[C@@H]2N3C(=O)[C@@H](NC(=O)[C@@H](c1ccc(O)cc1)N)[C@H]3SC2(C)C';
+            var width = 300;
+            var height = 200;
+            renderSmiles(uniqueId, smiles, width, height);
+        </script>
+    </body>
+</html>

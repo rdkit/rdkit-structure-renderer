@@ -109,7 +109,7 @@ const Depiction = {
         const _getFragsSafe = (opIdxIn) => {
             let opIdx = opIdxIn;
             let exc = '';
-            let molIterator = null;
+            let res = null;
             const opts = getFragsOpts || {};
             let op;
             if (typeof opIdx === 'number') {
@@ -119,11 +119,11 @@ const Depiction = {
                 opIdx = -1;
             }
             try {
-                molIterator = mol.get_frags(JSON.stringify(opts));
+                res = mol.get_frags(JSON.stringify(opts));
             } catch (e) {
                 exc = ` (${e})`;
             }
-            if (!molIterator) {
+            if (!res) {
                 if (++opIdx < FALLBACK_OPS.length) {
                     return _getFragsSafe(opIdx);
                 }
@@ -131,7 +131,7 @@ const Depiction = {
             } else if (op) {
                 console.error(`Failed to run ${op}`);
             }
-            return molIterator;
+            return res;
         };
         return _getFragsSafe();
     },
@@ -267,13 +267,11 @@ const Depiction = {
                     MOL_NORMALIZE: true,
                     MOL_CANONICALIZE: rebuild || optsLocal.RECOMPUTE2D,
                     MOL_STRAIGHTEN: true,
-                    ALIGN_REBUILD: optsLocal.RECOMPUTE2D,
                     USE_MOLBLOCK_WEDGING: !(rebuild || optsLocal.RECOMPUTE2D),
                 });
                 const normalize = behavior.MOL_NORMALIZE;
                 let straighten = behavior.MOL_STRAIGHTEN;
                 let canonicalize = (behavior.MOL_CANONICALIZE ? canonicalizeDir : 0);
-                let alignRebuild = behavior.ALIGN_REBUILD;
                 useMolBlockWedging = mol.has_coords() && behavior.USE_MOLBLOCK_WEDGING;
                 switch (type) {
                 case 'c': {
@@ -293,16 +291,13 @@ const Depiction = {
                     });
                     if (normalize && mol.normalize_depiction(0) < 0.0) {
                         rebuild = true;
-                        if (isBehaviorAuto.ALIGN_REBUILD) {
-                            alignRebuild = true;
-                        }
                     }
                     const canonicalizeScaffoldStored = behavior.SCAFFOLD_CANONICALIZE ? canonicalizeDir : 0;
                     match = null;
-                    if (alignRebuild) {
+                    if (optsLocal.RECOMPUTE2D) {
                         useMolBlockWedging = false;
                     }
-                    const alignOnly = !alignRebuild;
+                    const alignOnly = !optsLocal.RECOMPUTE2D;
                     const scaffoldTextArray = this.splitScaffoldText(scaffoldText);
                     const scaffoldIteratorArray = [];
                     scaffoldTextArray.every((maybeMultiScaffoldText) => {
@@ -319,6 +314,7 @@ const Depiction = {
                             return true;
                         }
                         const { molIterator } = this.getFragsSafe(scaffold);
+                        scaffold.delete();
                         if (molIterator) {
                             scaffoldIteratorArray.push(molIterator);
                         }
@@ -338,7 +334,8 @@ const Depiction = {
                             let normalizeScaffold = behavior.SCAFFOLD_NORMALIZE;
                             let canonicalizeScaffold = canonicalizeScaffoldStored;
                             let minimizeScaffoldRotation = !behavior.SCAFFOLD_CANONICALIZE;
-                            if (!scaffold.has_coords()) {
+                            let scaffoldHasCoords = scaffold.has_coords();
+                            if (!scaffoldHasCoords) {
                                 if (isBehaviorAuto.SCAFFOLD_NORMALIZE) {
                                     normalizeScaffold = true;
                                 }
@@ -349,56 +346,54 @@ const Depiction = {
                                     straightenScaffold = true;
                                     minimizeScaffoldRotation = false;
                                 }
-                                const hasCoords = this.setNewCoords(scaffold, true);
-                                if (!hasCoords) {
-                                    scaffold.delete();
-                                    continue;
+                                scaffoldHasCoords = this.setNewCoords(scaffold, true);
+                                if (!scaffoldHasCoords) {
+                                    console.error('Failed to generate coordinates for scaffold - ignoring it');
                                 }
                             }
-                            if (normalizeScaffold
+                            if (scaffoldHasCoords && normalizeScaffold
                                 && scaffold.normalize_depiction(canonicalizeScaffold) < 0.0) {
                                 console.error('Scaffold has bad coordinates - ignoring it');
-                                scaffold.delete();
-                                continue;
+                                scaffoldHasCoords = false;
                             }
-                            if (straightenScaffold) {
-                                scaffold.straighten_depiction(minimizeScaffoldRotation);
-                            }
-                            try {
-                                match = JSON.parse(mol.generate_aligned_coords(scaffold, JSON.stringify({
-                                    useCoordGen: true,
-                                    allowRGroups: true,
-                                    acceptFailure: false,
-                                    alignOnly,
-                                })) || null);
-                            } catch (e) {
-                                console.error(`Exception in generate_aligned_coords (${e})`);
-                            }
-                            if (match) {
-                                if (abbreviate) {
-                                    try {
-                                        const molCopy = rdkitModule.get_mol_copy(mol);
-                                        const mapping = JSON.parse(molCopy.condense_abbreviations());
-                                        // eslint-disable-next-line no-loop-func
-                                        ['atoms', 'bonds'].forEach((k) => {
-                                            const invMapping = Array(mapping[k].reduce(
-                                                (prev, curr) => (curr > prev ? curr : prev), -1
-                                            ) + 1).fill(-1);
-                                            mapping[k].forEach((idx, pos) => {
-                                                invMapping[idx] = pos;
-                                            });
-                                            match[k] = match[k].filter(
-                                                (i) => invMapping[i] !== -1).map((j) => invMapping[j]
-                                            );
-                                        });
-                                        molCopy.delete();
-                                    } catch (e) {
-                                        console.error(`Failed to apply abbreviations (${e})`);
-                                        match = null;
-                                    }
+                            if (scaffoldHasCoords) {
+                                if (straightenScaffold) {
+                                    scaffold.straighten_depiction(minimizeScaffoldRotation);
+                                }
+                                try {
+                                    match = JSON.parse(mol.generate_aligned_coords(scaffold, JSON.stringify({
+                                        useCoordGen: true,
+                                        allowRGroups: true,
+                                        acceptFailure: false,
+                                        alignOnly,
+                                    })) || null);
+                                } catch (e) {
+                                    console.error(`Exception in generate_aligned_coords (${e})`);
                                 }
                             }
                             scaffold.delete();
+                            if (match && abbreviate) {
+                                try {
+                                    const molCopy = rdkitModule.get_mol_copy(mol);
+                                    const mapping = JSON.parse(molCopy.condense_abbreviations());
+                                    // eslint-disable-next-line no-loop-func
+                                    ['atoms', 'bonds'].forEach((k) => {
+                                        const invMapping = Array(mapping[k].reduce(
+                                            (prev, curr) => (curr > prev ? curr : prev), -1
+                                        ) + 1).fill(-1);
+                                        mapping[k].forEach((idx, pos) => {
+                                            invMapping[idx] = pos;
+                                        });
+                                        match[k] = match[k].filter(
+                                            (i) => invMapping[i] !== -1).map((j) => invMapping[j]
+                                        );
+                                    });
+                                    molCopy.delete();
+                                } catch (e) {
+                                    console.error(`Failed to apply abbreviations (${e})`);
+                                    match = null;
+                                }
+                            }
                         }
                         scaffoldIterator.delete();
                         return (match === null);

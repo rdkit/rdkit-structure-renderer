@@ -734,7 +734,7 @@ const Renderer = {
                 pickle: null,
                 match: null,
                 svg: null,
-                rebuild: null,
+                wasRebuilt: null,
                 useMolBlockWedging: null,
             });
         }
@@ -1055,7 +1055,7 @@ const Renderer = {
             const lastRes = resArray[resArray.length - 1];
             res = {
                 match: firstRes.match,
-                rebuild: firstRes.rebuild,
+                wasRebuilt: firstRes.wasRebuilt,
                 // pickle and useMolBlockWedging will always be from the last promise
                 useMolBlockWedging: lastRes.useMolBlockWedging,
                 pickle: lastRes.pickle,
@@ -1150,7 +1150,7 @@ const Renderer = {
                 res = await this.getPickledMolAndMatch(divId, molText, scaffoldText, userOpts) || {};
             }
             const {
-                pickle, match, rebuild, useMolBlockWedging
+                pickle, match, wasRebuilt, useMolBlockWedging
             } = res;
             userOpts.USE_MOLBLOCK_WEDGING = useMolBlockWedging || false;
             if (pickle) {
@@ -1162,7 +1162,7 @@ const Renderer = {
                         this.clearFailsMatch(key);
                     }
                 }
-                if (rebuild) {
+                if (wasRebuilt) {
                     this.setWasRebuilt(key);
                 } else {
                     this.clearWasRebuilt(key);

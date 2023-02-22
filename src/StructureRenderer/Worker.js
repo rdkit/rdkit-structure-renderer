@@ -186,22 +186,22 @@ const Depiction = {
         let pickle = '';
         let hasCoords = mol.has_coords();
         const scaleFac = (normalize ? -1.0 : 1.0);
-        let rebuildLocal = rebuild || !hasCoords;
-        if (rebuildLocal || mol.normalize_depiction(canonicalize, scaleFac) < 0.0) {
-            rebuildLocal = true;
+        let wasRebuilt = rebuild || !hasCoords;
+        if (wasRebuilt || mol.normalize_depiction(canonicalize, scaleFac) < 0.0) {
+            wasRebuilt = true;
             hasCoords = this.setNewCoords(mol, useCoordGen);
         }
         if (hasCoords) {
-            if (rebuildLocal) {
+            if (wasRebuilt) {
                 mol.normalize_depiction(canonicalize, scaleFac);
             }
             if (straighten) {
-                const minimizeRotation = !rebuildLocal && !canonicalize;
+                const minimizeRotation = !wasRebuilt && !canonicalize;
                 mol.straighten_depiction(minimizeRotation);
             }
             pickle = this.getPickleSafe(mol);
         }
-        return { pickle, rebuildLocal };
+        return { pickle, wasRebuilt };
     },
 
     get({
@@ -272,7 +272,7 @@ const Depiction = {
                 const normalize = behavior.MOL_NORMALIZE;
                 let straighten = behavior.MOL_STRAIGHTEN;
                 let canonicalize = (behavior.MOL_CANONICALIZE ? canonicalizeDir : 0);
-                useMolBlockWedging = mol.has_coords() && behavior.USE_MOLBLOCK_WEDGING;
+                useMolBlockWedging = !(rebuild || optsLocal.RECOMPUTE2D) && behavior.USE_MOLBLOCK_WEDGING;
                 switch (type) {
                 case 'c': {
                     rebuild = true;
@@ -283,21 +283,25 @@ const Depiction = {
                     break;
                 }
                 case 'a': {
+                    // if we need new coordinates, we use CoordGen to generate them
                     useCoordGen = optsLocal.RECOMPUTE2D;
                     setBehavior({
                         SCAFFOLD_NORMALIZE: true,
                         SCAFFOLD_CANONICALIZE: false,
                         SCAFFOLD_STRAIGHTEN: true,
                     });
+                    // rebuild is set to true if 1) mol does not have coordinates to start with
+                    // 2) it fails coordinate normalization
                     if (normalize && mol.normalize_depiction(0) < 0.0) {
                         rebuild = true;
                     }
                     const canonicalizeScaffoldStored = behavior.SCAFFOLD_CANONICALIZE ? canonicalizeDir : 0;
                     match = null;
-                    if (optsLocal.RECOMPUTE2D) {
-                        useMolBlockWedging = false;
-                    }
+                    // if we do not recompute 2D coordinates, we only do a rigid-body rotation
                     const alignOnly = !optsLocal.RECOMPUTE2D;
+                    // scaffoldText can be a pipe-separated string of SMILES
+                    // or a $$$$-separated string of molblocks. Each scaffold can in turn
+                    // be constituted by mutliple disconnected fragments.
                     const scaffoldTextArray = this.splitScaffoldText(scaffoldText);
                     const scaffoldIteratorArray = [];
                     scaffoldTextArray.every((maybeMultiScaffoldText) => {
@@ -322,6 +326,7 @@ const Depiction = {
                     });
                     scaffoldIteratorArray.every((scaffoldIterator) => {
                         while (!match && !scaffoldIterator.at_end()) {
+                            // scaffold is a single disconnected fragment
                             const scaffold = scaffoldIterator.next();
                             if (!scaffold) {
                                 break;
@@ -335,6 +340,8 @@ const Depiction = {
                             let canonicalizeScaffold = canonicalizeScaffoldStored;
                             let minimizeScaffoldRotation = !behavior.SCAFFOLD_CANONICALIZE;
                             let scaffoldHasCoords = scaffold.has_coords();
+                            // if scaffold has no coordinates we normalize it, canonicalize it
+                            // and straighten it fully unless user explicitly requested otherwise
                             if (!scaffoldHasCoords) {
                                 if (isBehaviorAuto.SCAFFOLD_NORMALIZE) {
                                     normalizeScaffold = true;
@@ -351,11 +358,15 @@ const Depiction = {
                                     console.error('Failed to generate coordinates for scaffold - ignoring it');
                                 }
                             }
+                            // if scaffold has coordinates but fails normalization we ignore it
                             if (scaffoldHasCoords && normalizeScaffold
                                 && scaffold.normalize_depiction(canonicalizeScaffold) < 0.0) {
                                 console.error('Scaffold has bad coordinates - ignoring it');
                                 scaffoldHasCoords = false;
                             }
+                            // if scaffold has coordinates, we align mol to it through either
+                            // a full CoordGen rebuild (alignOnly=false) or a rigid-body rotation
+                            // (alignOnly=true)
                             if (scaffoldHasCoords) {
                                 if (straightenScaffold) {
                                     scaffold.straighten_depiction(minimizeScaffoldRotation);
@@ -372,6 +383,8 @@ const Depiction = {
                                 }
                             }
                             scaffold.delete();
+                            // if there is a match and abbreviation wer requested, the match
+                            // needs to be adjusted/pruned accordingly
                             if (match && abbreviate) {
                                 try {
                                     const molCopy = rdkitModule.get_mol_copy(mol);
@@ -396,14 +409,19 @@ const Depiction = {
                             }
                         }
                         scaffoldIterator.delete();
+                        // if there is a match we can quit the loop
                         return (match === null);
                     });
                     const rebuildStored = rebuild;
+                    // if there is a match, we only want to generate a pickle
                     if (match) {
                         rebuild = false;
                         straighten = false;
                         canonicalize = 0;
                     } else {
+                        // if there is no match, we keep the original coordinates
+                        // unless user asked for a coordinate rebuild, in which
+                        // case we run a CoordGen rebuild with no scaffold
                         useMolBlockWedging = false;
                         if (opts.RECOMPUTE2D) {
                             rebuild = true;
@@ -412,9 +430,7 @@ const Depiction = {
                     Object.assign(res, this.getNormPickle(mol, {
                         rebuild, useCoordGen, normalize, canonicalize, straighten
                     }));
-                    if (rebuildStored) {
-                        res.rebuild = rebuildStored;
-                    }
+                    res.wasRebuilt |= rebuildStored;
                     break;
                 }
                 case 'r': {

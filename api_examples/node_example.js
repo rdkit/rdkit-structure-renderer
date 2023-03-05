@@ -1,4 +1,5 @@
 const { Renderer } = require('../dist/rdkit-structure-renderer-node.js');
+const path = require('path');
 
 const defaultDrawOpts = {
     bondLineWidth: 0.7,
@@ -56,7 +57,7 @@ const scaffoldText = `
  11  6  1  0
 M  END`;
 
-const minimalLibPath = './public';
+const minimalLibPath = path.resolve(__dirname, '..', 'public');
 Renderer.getDefaultDrawOpts = () => defaultDrawOpts;
 (async () => {
     await Renderer.init(minimalLibPath/*, null, initRDKitModule*/);

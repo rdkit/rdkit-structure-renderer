@@ -11,10 +11,12 @@
                 padding: 0 3em 0 3em;
             }
             .structure {
+                margin: auto;
                 width: 300px;
                 height: 200px;
             }
             .invertedstructure {
+                margin: auto;
                 width: 200px;
                 height: 300px;
             }
@@ -423,6 +425,39 @@
                 </tr>
                 <tr>
                     <th>
+                        Canvas highlight<br>scaffold and abbreviate
+                    </th>
+                    <th>
+                        SVG highlight<br>scaffold, and abbreviate
+                    </th>
+                    <th>
+                        Canvas SMILES scaffold, no icons
+                    </th>
+                </tr>
+                <tr>
+                    <td>
+                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-18a"
+                            data-scaffold-highlight data-abbreviate
+                            data-scaffold="[nH]1cnc2ccccc12"
+                            data-mol="O=C(O)C(c1ccc(cc1)CCN4CCC(c2nc3ccccc3n2CCOCC)CC4)(C)C">
+                        </div>
+                    </td>
+                    <td>
+                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-19a"
+                            data-scaffold-highlight data-abbreviate data-use-svg
+                            data-scaffold="[nH]1cnc2ccccc12"
+                            data-mol="O=C(O)C(c1ccc(cc1)CCN4CCC(c2nc3ccccc3n2CCOCC)CC4)(C)C">
+                        </div>
+                    </td>
+                    <td>
+                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-20a"
+                            data-mol="[nH]1cnc2ccccc12"
+                            data-hide-cog data-hide-copy data-recompute2d>
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <th>
                         Canvas align, highlight<br>scaffold and abbreviate
                     </th>
                     <th>
@@ -455,6 +490,38 @@
                 </tr>
                 <tr>
                     <th>
+                        Canvas highlight<br>scaffold and abbreviate
+                    </th>
+                    <th>
+                        SVG highlight<br>scaffold, and abbreviate
+                    </th>
+                    <th>
+                        Canvas SMILES scaffold,<br>fails to kekulize
+                    </th>
+                </tr>
+                <tr>
+                    <td>
+                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-21a"
+                            data-scaffold-highlight data-abbreviate
+                            data-scaffold="n1cnc2ccccc12"
+                            data-mol="O=C(O)C(c1ccc(cc1)CCN4CCC(c2nc3ccccc3n2CCOCC)CC4)(C)C">
+                        </div>
+                    </td>
+                    <td>
+                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-22a"
+                            data-scaffold-highlight data-abbreviate data-use-svg
+                            data-scaffold="n1cnc2ccccc12"
+                            data-mol="O=C(O)C(c1ccc(cc1)CCN4CCC(c2nc3ccccc3n2CCOCC)CC4)(C)C">
+                        </div>
+                    </td>
+                    <td>
+                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-23a"
+                            data-mol="n1cnc2ccccc12" data-recompute2d>
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <th>
                         Canvas align, highlight<br>scaffold and abbreviate
                     </th>
                     <th>
@@ -466,21 +533,54 @@
                 </tr>
                 <tr>
                     <td>
-                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-21a"
+                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-21b"
                             data-scaffold-highlight data-scaffold-align data-abbreviate
                             data-scaffold="n1cnc2ccccc12"
                             data-mol="O=C(O)C(c1ccc(cc1)CCN4CCC(c2nc3ccccc3n2CCOCC)CC4)(C)C">
                         </div>
                     </td>
                     <td>
-                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-22a"
+                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-22b"
                             data-scaffold-highlight data-scaffold-align data-abbreviate data-use-svg
                             data-scaffold="n1cnc2ccccc12"
                             data-mol="O=C(O)C(c1ccc(cc1)CCN4CCC(c2nc3ccccc3n2CCOCC)CC4)(C)C">
                         </div>
                     </td>
                     <td>
-                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-23a"
+                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-23b"
+                            data-use-svg
+                            data-mol="n1cnc2ccccc12" data-recompute2d>
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <th>
+                        Canvas highlight<br>scaffold and abbreviate
+                    </th>
+                    <th>
+                        SVG highlight<br>scaffold, and abbreviate
+                    </th>
+                    <th>
+                        SVG SMILES scaffold,<br>fails to kekulize
+                    </th>
+                </tr>
+                <tr>
+                    <td>
+                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-21c"
+                            data-scaffold-highlight data-abbreviate
+                            data-scaffold="n1cnc2ccccc12"
+                            data-mol="O=C(O)C(c1ccc(cc1)CCN4CCC(c2nc3ccccc3n2CCOCC)CC4)(C)C">
+                        </div>
+                    </td>
+                    <td>
+                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-22c"
+                            data-scaffold-highlight data-abbreviate data-use-svg
+                            data-scaffold="n1cnc2ccccc12"
+                            data-mol="O=C(O)C(c1ccc(cc1)CCN4CCC(c2nc3ccccc3n2CCOCC)CC4)(C)C">
+                        </div>
+                    </td>
+                    <td>
+                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-23c"
                             data-use-svg
                             data-mol="n1cnc2ccccc12" data-recompute2d>
                         </div>
@@ -607,6 +707,38 @@
                 </tr>
                 <tr>
                     <th>
+                        Canvas highlight<br>scaffold and abbreviate
+                    </th>
+                    <th>
+                        SVG highlight<br>scaffold, and abbreviate
+                    </th>
+                    <th>
+                        Canvas SMILES scaffold,<br>matches, does not include<br>abbreviation
+                    </th>
+                </tr>
+                <tr>
+                    <td>
+                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-29a"
+                            data-scaffold-highlight data-abbreviate
+                            data-scaffold="[nH]1cnc2ccccc12"
+                            data-mol="O=C(O)C(c1ccc(cc1)CCN4CCC(c2nc3ccccc3n2CCOCC)CC4)(C)C">
+                        </div>
+                    </td>
+                    <td>
+                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-30a"
+                            data-scaffold-highlight data-abbreviate data-use-svg
+                            data-scaffold="[nH]1cnc2ccccc12"
+                            data-mol="O=C(O)C(c1ccc(cc1)CCN4CCC(c2nc3ccccc3n2CCOCC)CC4)(C)C">
+                        </div>
+                    </td>
+                    <td>
+                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-31a"
+                            data-mol="[nH]1cnc2ccccc12" data-recompute2d>
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <th>
                         Canvas align, highlight<br>scaffold and abbreviate
                     </th>
                     <th>
@@ -639,6 +771,38 @@
                 </tr>
                 <tr>
                     <th>
+                        Canvas highlight<br>scaffold and abbreviate
+                    </th>
+                    <th>
+                        SVG highlight<br>scaffold, and abbreviate
+                    </th>
+                    <th>
+                        Canvas SMILES scaffold,<br>matches, includes<br>abbreviation
+                    </th>
+                </tr>
+                <tr>
+                    <td>
+                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-32a"
+                            data-scaffold-highlight data-abbreviate
+                            data-scaffold="CCOCCn1cnc2ccccc12"
+                            data-mol="O=C(O)C(c1ccc(cc1)CCN4CCC(c2nc3ccccc3n2CCOCC)CC4)(C)C">
+                        </div>
+                    </td>
+                    <td>
+                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-33a"
+                            data-scaffold-highlight data-abbreviate data-use-svg
+                            data-scaffold="CCOCCn1cnc2ccccc12"
+                            data-mol="O=C(O)C(c1ccc(cc1)CCN4CCC(c2nc3ccccc3n2CCOCC)CC4)(C)C">
+                        </div>
+                    </td>
+                    <td>
+                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-34a"
+                            data-mol="CCOCCn1cnc2ccccc12" data-recompute2d>
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <th>
                         Canvas align, highlight<br>scaffold and abbreviate<br>multiple scaffold SMILES, 1st matches
                     </th>
                     <th>
@@ -650,21 +814,21 @@
                 </tr>
                 <tr>
                     <td>
-                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-32a"
+                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-32b"
                             data-scaffold-highlight data-scaffold-align data-abbreviate
                             data-scaffold="CCOCCn1cnc2ccccc12|CCOCCn1ccc2ccccc12"
                             data-mol="O=C(O)C(c1ccc(cc1)CCN4CCC(c2nc3ccccc3n2CCOCC)CC4)(C)C">
                         </div>
                     </td>
                     <td>
-                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-33a"
+                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-33b"
                             data-scaffold-highlight data-scaffold-align data-abbreviate data-use-svg
                             data-scaffold="CCOCCn1cnc2ccccc12|CCOCCn1ccc2ccccc12"
                             data-mol="O=C(O)C(c1ccc(cc1)CCN4CCC(c2nc3ccccc3n2CCOCC)CC4)(C)C">
                         </div>
                     </td>
                     <td>
-                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-34a"
+                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-34b"
                             data-mol="CCOCCn1cnc2ccccc12" data-recompute2d>
                         </div>
                     </td>
@@ -682,21 +846,21 @@
                 </tr>
                 <tr>
                     <td>
-                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-32b"
+                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-32c"
                             data-scaffold-highlight data-scaffold-align data-abbreviate
                             data-scaffold="CCOCCn1ccc2ccccc12|CCOCCn1cnc2ccccc12"
                             data-mol="O=C(O)C(c1ccc(cc1)CCN4CCC(c2nc3ccccc3n2CCOCC)CC4)(C)C">
                         </div>
                     </td>
                     <td>
-                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-33b"
+                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-33c"
                             data-scaffold-highlight data-scaffold-align data-abbreviate data-use-svg
                             data-scaffold="CCOCCn1ccc2ccccc12|CCOCCn1cnc2ccccc12"
                             data-mol="O=C(O)C(c1ccc(cc1)CCN4CCC(c2nc3ccccc3n2CCOCC)CC4)(C)C">
                         </div>
                     </td>
                     <td>
-                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-34b"
+                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-34c"
                             data-mol="CCOCCn1ccc2ccccc12" data-recompute2d>
                         </div>
                     </td>
@@ -714,21 +878,21 @@
                 </tr>
                 <tr>
                     <td>
-                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-32c"
+                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-32d"
                             data-scaffold-highlight data-scaffold-align data-abbreviate
                             data-scaffold="CCOCCn1ccc2CCCCc12|CCOCCn1cnc2CCCCc12"
                             data-mol="O=C(O)C(c1ccc(cc1)CCN4CCC(c2nc3ccccc3n2CCOCC)CC4)(C)C">
                         </div>
                     </td>
                     <td>
-                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-33c"
+                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-33d"
                             data-scaffold-highlight data-scaffold-align data-abbreviate data-use-svg
                             data-scaffold="CCOCCn1ccc2CCCCc12|CCOCCn1cnc2CCCCc12"
                             data-mol="O=C(O)C(c1ccc(cc1)CCN4CCC(c2nc3ccccc3n2CCOCC)CC4)(C)C">
                         </div>
                     </td>
                     <td>
-                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-34c"
+                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-34d"
                             data-mol="CCOCCn1ccc2CCCCc12.CCOCCn1cnc2CCCCc12" data-recompute2d>
                         </div>
                     </td>
@@ -746,21 +910,21 @@
                 </tr>
                 <tr>
                     <td>
-                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-32d"
+                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-32e"
                             data-scaffold-highlight data-scaffold-align data-abbreviate
                             data-scaffold="CCOCCn1cnc2ccccc12.CCOCCn1ccc2ccccc12"
                             data-mol="O=C(O)C(c1ccc(cc1)CCN4CCC(c2nc3ccccc3n2CCOCC)CC4)(C)C">
                         </div>
                     </td>
                     <td>
-                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-33d"
+                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-33e"
                             data-scaffold-highlight data-scaffold-align data-abbreviate data-use-svg
                             data-scaffold="CCOCCn1cnc2ccccc12.CCOCCn1ccc2ccccc12"
                             data-mol="O=C(O)C(c1ccc(cc1)CCN4CCC(c2nc3ccccc3n2CCOCC)CC4)(C)C">
                         </div>
                     </td>
                     <td>
-                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-34d"
+                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-34e"
                             data-mol="CCOCCn1cnc2ccccc12.CCOCCn1ccc2ccccc12" data-recompute2d>
                         </div>
                     </td>
@@ -778,21 +942,21 @@
                 </tr>
                 <tr>
                     <td>
-                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-32e"
+                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-32f"
                             data-scaffold-highlight data-scaffold-align data-abbreviate
                             data-scaffold="CCOCCn1ccc2ccccc12.CCOCCn1cnc2ccccc12"
                             data-mol="O=C(O)C(c1ccc(cc1)CCN4CCC(c2nc3ccccc3n2CCOCC)CC4)(C)C">
                         </div>
                     </td>
                     <td>
-                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-33e"
+                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-33f"
                             data-scaffold-highlight data-scaffold-align data-abbreviate data-use-svg
                             data-scaffold="CCOCCn1ccc2ccccc12.CCOCCn1cnc2ccccc12"
                             data-mol="O=C(O)C(c1ccc(cc1)CCN4CCC(c2nc3ccccc3n2CCOCC)CC4)(C)C">
                         </div>
                     </td>
                     <td>
-                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-34e"
+                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-34f"
                             data-mol="CCOCCn1ccc2ccccc12.CCOCCn1cnc2ccccc12" data-recompute2d>
                         </div>
                     </td>
@@ -810,21 +974,21 @@
                 </tr>
                 <tr>
                     <td>
-                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-32f"
+                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-32g"
                             data-scaffold-highlight data-scaffold-align data-abbreviate
                             data-scaffold="CCOCCn1ccc2CCCCc12.CCOCCn1cnc2CCCCc12"
                             data-mol="O=C(O)C(c1ccc(cc1)CCN4CCC(c2nc3ccccc3n2CCOCC)CC4)(C)C">
                         </div>
                     </td>
                     <td>
-                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-33f"
+                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-33g"
                             data-scaffold-highlight data-scaffold-align data-abbreviate data-use-svg
                             data-scaffold="CCOCCn1ccc2CCCCc12.CCOCCn1cnc2CCCCc12"
                             data-mol="O=C(O)C(c1ccc(cc1)CCN4CCC(c2nc3ccccc3n2CCOCC)CC4)(C)C">
                         </div>
                     </td>
                     <td>
-                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-34f"
+                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-34g"
                             data-mol="CCOCCn1ccc2CCCCc12.CCOCCn1cnc2CCCCc12" data-recompute2d>
                         </div>
                     </td>

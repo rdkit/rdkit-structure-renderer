@@ -2,6 +2,8 @@
 
 const path = require("path");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
+const { version } = require("./package.json");
+const { DefinePlugin } = require("webpack");
 
 const isProduction = process.env.NODE_ENV == "production";
 
@@ -28,6 +30,11 @@ const config = {
             },
         ],
     },
+    plugins: [
+        new DefinePlugin({
+            PKG_VERSION: `'${version}'`,
+        }),
+    ],
 };
 
 module.exports = () => {
@@ -81,12 +88,36 @@ module.exports = () => {
             host: "localhost",
             port: 7800,
         },
-        plugins: [
+        plugins: [ ...config.plugins,
             new HtmlWebpackPlugin({
                 template: "index.html",
             }),
         ],
     };
 
-    return [ scriptConfig, moduleConfig ];
+    // MINIMALLIB_PATH is relative to the pkg/dist-src/StructureRenderer directory,
+    // which is where Renderer.js (which references MINIMALLIB_PATH )lives
+    const nodeConfig = {
+        ...config,
+        entry: {
+            app: [
+                "core-js/stable",
+                "./pkg/dist-src/index.js"
+            ]
+        },
+        target: "node",
+        output: {
+            path: path.resolve(__dirname, "dist"),
+            publicPath: "",
+            filename: "rdkit-structure-renderer-node.js",
+            libraryTarget: "commonjs2",
+        },
+        plugins: [ ...config.plugins,
+            new DefinePlugin({
+                MINIMALLIB_PATH: `'${path.join("..", "..", "..", "public", `RDKit_minimal.${version}.js`)}'`,
+            }),
+        ],
+    };
+
+    return [ scriptConfig, moduleConfig, nodeConfig ];
 };

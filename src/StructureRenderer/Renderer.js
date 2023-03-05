@@ -62,10 +62,10 @@ import {
     CLIPBOARD_OPTS,
     WHL_OPTS,
 } from './constants';
-import { version as packageVersion } from '../version';
 
 let _RDKitModule;
 const haveWindow = (typeof window !== 'undefined');
+const isNodeJs = (typeof process !== 'undefined');
 const _window = (haveWindow ? window : {
     devicePixelRatio: 1,
 });
@@ -74,11 +74,11 @@ const haveWebAssembly = (() => {
     try {
         if (typeof WebAssembly === 'object'
             && typeof WebAssembly.instantiate === 'function') {
-            const module = new WebAssembly.Module(
+            const wasmModule = new WebAssembly.Module(
                 Uint8Array.of(0x0, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00)
             );
-            if (module instanceof WebAssembly.Module) {
-                return new WebAssembly.Instance(module) instanceof WebAssembly.Instance;
+            if (wasmModule instanceof WebAssembly.Module) {
+                return new WebAssembly.Instance(wasmModule) instanceof WebAssembly.Instance;
             }
         }
     } catch (e) {
@@ -92,7 +92,7 @@ const Renderer = {
      * Override to change, by default returns true on IE11.
      * @returns {boolean} whether this is running on a legacy browser
      */
-    getIsLegacyBrowser: () => !window.ActiveXObject && 'ActiveXObject' in window,
+    getIsLegacyBrowser: () => haveWindow && !window.ActiveXObject && 'ActiveXObject' in window,
     /**
      * Override to change, currently hardware concurrency minus 2.
      * @returns {number} Hardware concurrency
@@ -408,7 +408,7 @@ const Renderer = {
      * @returns {Promise} Promise that resolves to the RDKit module
      * once the latter is loaded and initialized
      */
-    init(minimalLibPathIn, basenameIn) {
+    init(minimalLibPathIn, basenameIn, initRDKitModuleExt) {
         const takeParent = (path) => path.substring(0, path.lastIndexOf('/'));
         let basename = basenameIn;
         let minimalLibPath = minimalLibPathIn;
@@ -432,27 +432,34 @@ const Renderer = {
                 minimalLibPath = takeParent(minimalLibPath);
             }
             this._minimalLibPath = minimalLibPath;
-            this._minimalLibJs = `${this._minimalLibPath}/${basename}.${packageVersion}.js`;
-            if (!haveWindow) {
-                const modulePaths = ['', ...module.paths];
-                if (!modulePaths.some((path) => {
+            // PKG_VERSION and MINIMALLIB_PATH are string literals which are replaced at
+            // compile time by webpack.DefinePlugin, so we can silence linter warnings
+            // eslint-disable-next-line no-undef
+            this._minimalLibJs = `${this._minimalLibPath}/${basename}.${PKG_VERSION}.js`;
+            if (isNodeJs) {
+                if (typeof initRDKitModuleExt !== 'function') {
+                    let msg;
                     try {
-                        minimalLibPath = `${path ? path + '/' : ''}${this._minimalLibJs}`;
-                        // Using backticks avoids the following webpack warning:
-                        // 'Critical dependency: the request of a dependency is an expression'
-                        // eslint-disable-next-line import/no-dynamic-require, global-require
-                        _window.initRDKitModule = require(`${minimalLibPath}`);
-                    } catch (e) {
-                        if (e.code !== 'MODULE_NOT_FOUND') {
-                            throw e;
+                        // eslint-disable-next-line no-undef, import/no-dynamic-require, global-require
+                        const initRDKitModule = require(MINIMALLIB_PATH);
+                        if (typeof initRDKitModule === 'function') {
+                            _window.initRDKitModule = initRDKitModule;
+                        } else {
+                            msg = `initRDKitModule: expected function, got ${typeof initRDKitModule}`;
                         }
-                        return false;
+                    } catch (e) {
+                        msg = e;
                     }
-                    this._minimalLibPath = minimalLibPath.substring(0, minimalLibPath.lastIndexOf('/'));
-                    this._minimalLibJs = minimalLibPath;
-                    return true;
-                })) {
-                    throw Error(`Failed to find module ${this._minimalLibJs}`);
+                    if (typeof _window.initRDKitModule !== 'function') {
+                        // eslint-disable-next-line no-undef
+                        throw Error(`Failed to dynamically import ${MINIMALLIB_PATH}:\n${msg}\n` +
+                            'It looks like you may have moved the file elsewhere.\n' +
+                            'Either restore its original location in the public directory or add\n' +
+                            'const initRDKitModule = require("./public/RDKit_minimal.VERSION.js");\n' +
+                            'to your NodeJS script and then call Renderer.init(minimalLibPath, null, initRDKitModule)');
+                    }
+                } else {
+                    _window.initRDKitModule = initRDKitModuleExt;
                 }
             }
             // create the Scheduler (which in turn may spawn WebWorkers)
@@ -464,7 +471,8 @@ const Renderer = {
             const TIMEOUT = 50;
             const RDK_LOADER_ID = `${this.getRdkStrRnrPrefix()}loader`;
             if (typeof _RDKitModule === 'undefined') {
-                console.log(`rdkit-structure-renderer version: ${packageVersion}`);
+                // eslint-disable-next-line no-undef
+                console.log(`rdkit-structure-renderer version: ${PKG_VERSION}`);
                 _RDKitModule = null;
                 if (haveWindow && !document.getElementById(RDK_LOADER_ID)) {
                     const rdkitLoaderScript = document.createElement('script');
@@ -473,6 +481,11 @@ const Renderer = {
                     rdkitLoaderScript.async = true;
                     rdkitLoaderScript.onload = () => _loadRDKitModule(resolve);
                     document.head.appendChild(rdkitLoaderScript);
+                } else if (!haveWindow && !isNodeJs && typeof importScripts === 'function') {
+                    // eslint-disable-next-line no-undef
+                    importScripts(this._minimalLibJs);
+                    // eslint-disable-next-line no-undef
+                    _window.initRDKitModule = initRDKitModule;
                 }
             }
             if (_window.initRDKitModule || _RDKitModule) {
@@ -482,7 +495,8 @@ const Renderer = {
                         throw Error('_loadRDKitModule: initRDKitModule is not a function');
                     }
                     _RDKitModule = _window.initRDKitModule({
-                        locateFile: () => `${this._minimalLibPath}/${basename}.${packageVersion}.wasm`
+                        // eslint-disable-next-line no-undef
+                        locateFile: () => `${this._minimalLibPath}/${basename}.${PKG_VERSION}.wasm`
                     });
                     res = (async () => {
                         _RDKitModule = await _RDKitModule;
@@ -982,15 +996,12 @@ const Renderer = {
                     return null;
                 }
                 const drawOptsText = JSON.stringify(drawOpts);
-                const type = molDraw?.nodeName;
-                if (type) {
-                    if (type === 'CANVAS') {
-                        return mol.draw_to_canvas_with_highlights(molDraw, drawOptsText);
-                    }
-                    if (type !== 'DIV') {
-                        console.error(`write2DLayout: unsupported nodeName ${type}`);
-                        return null;
-                    }
+                if (molDraw?.getContext) {
+                    return mol.draw_to_canvas_with_highlights(molDraw, drawOptsText);
+                }
+                if (molDraw?.nodeName && molDraw.nodeName !== 'DIV') {
+                    console.error(`write2DLayout: unsupported nodeName ${molDraw.nodeName}`);
+                    return null;
                 }
                 svg = mol.get_svg_with_highlights(drawOptsText);
             } else if (typeof mol === 'string') {
@@ -1075,6 +1086,7 @@ const Renderer = {
      * @param {number|null} height image height
      * @param {number|null} scaleFac image scaling factor
      * @param {boolean|null} transparent whether background should be transparent
+     * @returns {object} overridden drawOpts
      */
     overrideDrawOpts({
         drawOpts, userOpts, match, width, height, scaleFac, transparent
@@ -1088,7 +1100,7 @@ const Renderer = {
             transparent = !this.getIsLegacyBrowser();
         }
         drawOpts = { ...this.getDefaultDrawOpts(), ...(drawOpts || {}) };
-        if (userOpts.USE_MOLBLOCK_WEDGING) {
+        if (typeof userOpts.USE_MOLBLOCK_WEDGING === 'boolean' && userOpts.USE_MOLBLOCK_WEDGING) {
             Object.assign(drawOpts, {
                 useMolBlockWedging: true,
                 wedgeBonds: false,
@@ -1147,7 +1159,10 @@ const Renderer = {
             const divId = this.getDivId(div);
             if (!res) {
                 const molText = this.getMol(div);
-                res = await this.getPickledMolAndMatch(divId, molText, scaffoldText, userOpts) || {};
+                drawOpts = this.overrideDrawOpts({
+                    drawOpts, userOpts, width, height, transparent
+                });
+                res = await this.getPickledMolAndMatch(divId, molText, scaffoldText, { drawOpts, ...userOpts }) || {};
             }
             const {
                 pickle, match, wasRebuilt, useMolBlockWedging
@@ -1405,6 +1420,42 @@ const Renderer = {
     },
 
     /**
+     * Dumps the canvas content to a base64-encoded PNG string.
+     * @param {Canvas|OffscreenCanvas} canvas
+     * @returns {string} base64-encoded PNG
+     */
+    async toDataURL(canvas) {
+        if (typeof canvas.toDataURL === 'function') {
+            return canvas.toDataURL();
+        }
+        if (typeof FileReaderSync !== 'undefined') {
+            const blob = await this.toBlob(canvas);
+            if (blob && typeof FileReaderSync !== 'undefined') {
+                // eslint-disable-next-line no-undef
+                return new FileReaderSync().readAsDataURL(blob);
+            }
+        }
+        return null;
+    },
+
+    /**
+     * Dumps the canvas content to a PNG Blob.
+     * @param {Canvas|OffscreenCanvas} canvas
+     * @returns {Blob} PNG Blob
+     */
+    toBlob(canvas) {
+        if (typeof canvas.toBlob === 'function') {
+            return new Promise((resolve) => {
+                canvas.toBlob((img) => resolve(img));
+            });
+        }
+        if (typeof canvas.convertToBlob === 'function') {
+            return canvas.convertToBlob();
+        }
+        return null;
+    },
+
+    /**
      * Get an image with the 2D structure associated to the passed JSMol.
      * @param {JSMol} mol RDKitJS molecule
      * @param {object} opts optional dictionary with drawing options:
@@ -1437,24 +1488,28 @@ const Renderer = {
             } catch (e) {
                 console.error(`Failed to generate SVG image (${e})`);
             }
-        } else if (haveWindow) {
-            const canvas = document.createElement('canvas');
-            this.resizeMolDraw(canvas, drawOpts.width, drawOpts.height, 1);
-            try {
-                if (this.write2DLayout(mol, drawOpts, canvas) !== null) {
-                    image = isBase64Png ? canvas.toDataURL()
-                        : await new Promise((resolve) => {
-                            canvas.toBlob((img) => resolve(img));
-                        });
-                    if (!image) {
-                        console.error('Failed to generate PNG image');
-                    }
-                }
-            } catch (e) {
-                console.error(`Failed to draw to canvas (${e})`);
-            }
         } else {
-            console.error('Canvas is not available on this platform');
+            let canvas;
+            if (haveWindow) {
+                canvas = document.createElement('canvas');
+                this.resizeMolDraw(canvas, drawOpts.width, drawOpts.height, 1);
+            } else if (typeof OffscreenCanvas !== 'undefined') {
+                canvas = new OffscreenCanvas(drawOpts.width, drawOpts.height);
+            } else {
+                console.error('Canvas is not available on this platform');
+            }
+            if (canvas) {
+                try {
+                    if (this.write2DLayout(mol, drawOpts, canvas) !== null) {
+                        image = isBase64Png ? await this.toDataURL(canvas) : await this.toBlob(canvas);
+                        if (!image) {
+                            console.error('Failed to generate PNG image');
+                        }
+                    }
+                } catch (e) {
+                    console.error(`Failed to draw to canvas (${e})`);
+                }
+            }
         }
         return image;
     },

@@ -383,7 +383,7 @@ const Depiction = {
                                 }
                             }
                             scaffold.delete();
-                            // if there is a match and abbreviation wer requested, the match
+                            // if there is a match and abbreviations were requested, the match
                             // needs to be adjusted/pruned accordingly
                             if (match && abbreviate) {
                                 try {

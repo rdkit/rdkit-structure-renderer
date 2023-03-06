@@ -65,7 +65,7 @@ import {
 
 let _RDKitModule;
 const haveWindow = (typeof window !== 'undefined');
-const isNodeJs = (typeof process !== 'undefined');
+const isNodeJs = (typeof process !== 'undefined' && process.release?.name === 'node' && typeof require !== 'undefined');
 const _window = (haveWindow ? window : {
     devicePixelRatio: 1,
 });

@@ -25,7 +25,6 @@ const defaultDrawOpts = {
     },
     backgroundColour: [1, 1, 1, 1],
 };
-const numWebWorkers = 0;
 
 const molText = 'C1CC1N2C=C(C(=O)C3=CC(=C(C=C32)N4CCNCC4)F)C(=O)O';
 const scaffoldText = `

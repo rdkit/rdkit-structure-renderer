@@ -1,14 +1,13 @@
 {
     "name": "rdkit-structure-renderer",
-    "version": "1.1.28",
+    "version": "1.1.27",
     "description": "A JS library to render molecules as HTML5 Canvas or SVG using RDKit MinimalLib",
-    "main": "pkg/dist-src/index.js",
+    "main": "dist/rdkit-structure-renderer-module.js",
     "scripts": {
         "test": "echo \"Error: no test specified\" && exit 1",
-        "build": "npm run build:pkg && npm run build:prod",
+        "build": "npm run build:prod",
         "build:dev": "webpack --mode=development",
         "build:prod": "webpack --mode=production --node-env=production",
-        "build:pkg": "pika build",
         "lint": "eslint src",
         "lint:fix": "eslint --fix --ext .js,.jsx .",
         "watch": "webpack --watch",
@@ -36,14 +35,6 @@
         "@babel/core": "^7.17.5",
         "@babel/plugin-transform-runtime": "^7.17.0",
         "@babel/preset-env": "^7.16.11",
-        "@pika/pack": "^0.5.0",
-        "@pika/plugin-build-node": "^0.5.0",
-        "@pika/plugin-build-umd": "^0.5.0",
-        "@pika/plugin-build-web": "^0.5.0",
-        "@pika/plugin-bundle-node": "^0.5.0",
-        "@pika/plugin-bundle-web": "^0.5.0",
-        "@pika/plugin-copy-assets": "^0.5.0",
-        "@pika/plugin-standard-pkg": "^0.5.0",
         "@webpack-cli/generators": "^2.4.2",
         "babel-loader": "^8",
         "eslint": "^8.10.0",
@@ -64,28 +55,6 @@
         "plugins": [
             [
                 "@babel/transform-runtime"
-            ]
-        ]
-    },
-    "@pika/pack": {
-        "pipeline": [
-            [
-                "@pika/plugin-standard-pkg",
-                {
-                    "exclude": [
-                        "**/__tests__/**",
-                        "**/*.stories.*"
-                    ]
-                }
-            ],
-            [
-                "@pika/plugin-build-node"
-            ],
-            [
-                "@pika/plugin-build-umd",
-                {
-                    "name": "epicUi"
-                }
             ]
         ]
     },

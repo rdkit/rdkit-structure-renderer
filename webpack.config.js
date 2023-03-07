@@ -33,6 +33,7 @@ const config = {
     plugins: [
         new DefinePlugin({
             PKG_VERSION: `'${version}'`,
+            MINIMALLIB_PATH: `'${path.join("..", "..", "public", `RDKit_minimal.${version}.js`)}'`,
         }),
     ],
 };
@@ -47,20 +48,22 @@ module.exports = () => {
     const moduleConfig = {
         ...config,
         entry: {
-            app: [
+            main: [
                 "core-js/stable",
-                "./pkg/dist-src/index.js"
+                "./src/index.js"
             ]
         },
+        /*
         experiments: {
             outputModule: true,
         },
+        */
         output: {
             path: path.resolve(__dirname, "dist"),
             publicPath: "",
             filename: "rdkit-structure-renderer-module.js",
             library: {
-                type: "module",
+                type: "umd",
             },
         },
     };
@@ -70,7 +73,7 @@ module.exports = () => {
         entry: {
             app: [
                 "core-js/stable",
-                "./pkg/dist-src/bundle.js"
+                "./src/bundle.js"
             ]
         },
         target: ["web", "es5"],
@@ -95,14 +98,14 @@ module.exports = () => {
         ],
     };
 
-    // MINIMALLIB_PATH is relative to the pkg/dist-src/StructureRenderer directory,
+    // MINIMALLIB_PATH is relative to the src/StructureRenderer directory,
     // which is where Renderer.js (which references MINIMALLIB_PATH )lives
     const nodeConfig = {
         ...config,
         entry: {
             app: [
                 "core-js/stable",
-                "./pkg/dist-src/index.js"
+                "./src/index.js"
             ]
         },
         target: "node",
@@ -112,11 +115,6 @@ module.exports = () => {
             filename: "rdkit-structure-renderer-node.js",
             libraryTarget: "commonjs2",
         },
-        plugins: [ ...config.plugins,
-            new DefinePlugin({
-                MINIMALLIB_PATH: `'${path.join("..", "..", "..", "public", `RDKit_minimal.${version}.js`)}'`,
-            }),
-        ],
     };
 
     return [ scriptConfig, moduleConfig, nodeConfig ];

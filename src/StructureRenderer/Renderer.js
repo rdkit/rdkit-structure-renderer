@@ -39,16 +39,7 @@ import Dispatcher from './Dispatcher';
 import LocalDispatcher from './LocalDispatcher';
 import SettingsDialog from './SettingsDialog';
 import ButtonTooltip from './ButtonTooltip';
-import {
-    getMinimalLibBasename,
-    cssToText,
-    decodeNewline,
-    dataAttr,
-    dashToCamelCase,
-    getMolblockFromMol,
-    getMolFromUInt8Array,
-    keyToTag,
-} from './utils';
+import Utils from './utils';
 import {
     DEFAULT_IMG_OPTS,
     DEFAULT_DRAW_OPTS,
@@ -207,7 +198,7 @@ const Renderer = {
      */
     getDivAttrs() {
         if (!this._divAttrs) {
-            this._divAttrs = Object.fromEntries(DIV_ATTRS.map((k) => [k, keyToTag(k)]));
+            this._divAttrs = Object.fromEntries(DIV_ATTRS.map((k) => [k, Utils.keyToTag(k)]));
         }
         return this._divAttrs;
     },
@@ -241,7 +232,7 @@ const Renderer = {
     setAvailUserOpts(userOpts) {
         this._userOpts = Object.fromEntries(
             Object.entries(userOpts || this.getDefaultUserOpts()).map(
-                ([k, text]) => [k, { tag: keyToTag(k), text }]
+                ([k, text]) => [k, { tag: Utils.keyToTag(k), text }]
             ),
         );
     },
@@ -385,7 +376,7 @@ const Renderer = {
             return;
         }
         let css = cssIn || this.getRendererCss();
-        css = cssToText(css);
+        css = Utils.cssToText(css);
         if (!style) {
             style = document.createElement('style');
             const styleText = document.createTextNode(css);
@@ -413,7 +404,7 @@ const Renderer = {
         let basename = basenameIn;
         let minimalLibPath = minimalLibPathIn;
         if (!basename) {
-            basename = getMinimalLibBasename();
+            basename = Utils.getMinimalLibBasename();
             if (!haveWebAssembly) {
                 basename += '_legacy';
             }
@@ -631,7 +622,7 @@ const Renderer = {
             elem.setAttribute('class', elem.className.replace(re, disable ? ` ${item}` : ''));
         };
         const disable = !shouldEnable;
-        button.setAttribute('disabled', disable);
+        button.disabled = disable;
         if (useGreyOut) {
             const iconSpan = button.firstChild.firstChild;
             modifyClass(iconSpan, 'disabled-icon', disable);
@@ -792,8 +783,8 @@ const Renderer = {
      * @returns {string} molecule description (SMILES, molblock, pkl_base64)
      */
     getMol(div) {
-        const attr = dataAttr(this.getDivAttrs().MOL);
-        return decodeNewline(div.getAttribute(attr) || '');
+        const attr = Utils.dataAttr(this.getDivAttrs().MOL);
+        return Utils.decodeNewline(div.getAttribute(attr) || '');
     },
 
     /**
@@ -871,8 +862,8 @@ const Renderer = {
      * ('$$$$', molblock)
      */
     getScaffold(div) {
-        const attr = dataAttr(this.getDivAttrs().SCAFFOLD);
-        return decodeNewline(div.getAttribute(attr) || '');
+        const attr = Utils.dataAttr(this.getDivAttrs().SCAFFOLD);
+        return Utils.decodeNewline(div.getAttribute(attr) || '');
     },
 
     /**
@@ -884,7 +875,7 @@ const Renderer = {
      */
     getRelatedNodes(div) {
         return Object.fromEntries(this.relatedNodes().map(
-            (k) => [dashToCamelCase(k), div.getAttribute(dataAttr(k))]
+            (k) => [Utils.dashToCamelCase(k), div.getAttribute(Utils.dataAttr(k))]
         ));
     },
 
@@ -897,7 +888,7 @@ const Renderer = {
      */
     getJsonOpt(div, opt) {
         let value = null;
-        const attr = dataAttr(opt);
+        const attr = Utils.dataAttr(opt);
         if (div.hasAttribute(attr)) {
             value = div.getAttribute(attr);
             try {
@@ -919,7 +910,7 @@ const Renderer = {
      */
     setJsonOpt(div, opt, value) {
         let jsonValue = null;
-        const attr = dataAttr(opt);
+        const attr = Utils.dataAttr(opt);
         if (value) {
             try {
                 jsonValue = JSON.stringify(value);
@@ -975,7 +966,7 @@ const Renderer = {
      * @param {boolean} value
      */
     setDivOpt(div, opt, value) {
-        div.setAttribute(dataAttr(opt), !!value);
+        div.setAttribute(Utils.dataAttr(opt), !!value);
     },
 
     /**
@@ -1094,7 +1085,7 @@ const Renderer = {
         userOpts = userOpts || {};
         width = width || DEFAULT_IMG_OPTS.width;
         height = height || DEFAULT_IMG_OPTS.height;
-        scaleFac = scaleFac || this.copyImgScaleFac || DEFAULT_IMG_OPTS.scaleFac;
+        scaleFac = scaleFac || DEFAULT_IMG_OPTS.scaleFac;
         match = match || {};
         if (typeof transparent === 'undefined') {
             transparent = !this.getIsLegacyBrowser();
@@ -1198,7 +1189,7 @@ const Renderer = {
                         try {
                             if (returnMolBlock) {
                                 const molBlockParams = this.getMolblockParams(useMolBlockWedging);
-                                molblock = getMolblockFromMol(mol, molBlockParams);
+                                molblock = Utils.getMolblockFromMol(mol, molBlockParams);
                             }
                             if (!useSvg) {
                                 if (userOpts.ABBREVIATE) {
@@ -1283,7 +1274,7 @@ const Renderer = {
             const useMolBlockWedging = this.shouldUseMolBlockWedging(mol, userOpts);
             const molBlockParams = this.getMolblockParams(useMolBlockWedging);
             if (res.molblock === '') {
-                res.molblock = getMolblockFromMol(mol, molBlockParams);
+                res.molblock = Utils.getMolblockFromMol(mol, molBlockParams);
             }
             if (res.smiles === '' || res.inchi === '') {
                 mol.remove_hs_in_place();
@@ -1319,7 +1310,7 @@ const Renderer = {
     async getMolFromPickle(pickle) {
         // block until rdkitModule is ready
         const rdkitModule = await this.getRDKitModule();
-        return getMolFromUInt8Array(rdkitModule, pickle);
+        return Utils.getMolFromUInt8Array(rdkitModule, pickle);
     },
 
     /**
@@ -1481,7 +1472,7 @@ const Renderer = {
         if (userOpts?.ABBREVIATE) {
             mol.condense_abbreviations();
         }
-        const drawOpts = this.overrideDrawOpts(opts);
+        const drawOpts = this.overrideDrawOpts({ ...opts, scaleFac: this.copyImgScaleFac });
         if (isSvg) {
             try {
                 image = this.write2DLayout(mol, drawOpts);
@@ -1612,7 +1603,7 @@ const Renderer = {
                     const type = 'text/plain';
                     const useMolBlockWedging = this.shouldUseMolBlockWedging(mol, userOpts);
                     const molBlockParams = this.getMolblockParams(useMolBlockWedging);
-                    const molblock = getMolblockFromMol(mol, molBlockParams);
+                    const molblock = Utils.getMolblockFromMol(mol, molBlockParams);
                     content[type] = new Blob([molblock], { type });
                 }
                 if (hasPng || hasSvg) {
@@ -1626,7 +1617,7 @@ const Renderer = {
                         drawOpts,
                         userOpts,
                     };
-                    const image = this.getImageFromMol(mol, opts);
+                    const image = await this.getImageFromMol(mol, opts);
                     if (!image) {
                         this.logClipboardError();
                     } else if (hasSvg) {
@@ -1806,9 +1797,9 @@ const Renderer = {
      */
     getRoundedDivSize(div) {
         const divRect = div.getBoundingClientRect();
-        const width = parseInt(div.getAttribute(dataAttr(this.getDivAttrs().WIDTH)) || '0', 10)
+        const width = parseInt(div.getAttribute(Utils.dataAttr(this.getDivAttrs().WIDTH)) || '0', 10)
             || Math.round(divRect.width) || DEFAULT_IMG_OPTS.width;
-        const height = parseInt(div.getAttribute(dataAttr(this.getDivAttrs().HEIGHT)) || '0', 10)
+        const height = parseInt(div.getAttribute(Utils.dataAttr(this.getDivAttrs().HEIGHT)) || '0', 10)
             || Math.round(divRect.height) || DEFAULT_IMG_OPTS.height;
         return { width, height };
     },
@@ -1973,7 +1964,7 @@ const Renderer = {
         const key = this.getCacheKey(div);
         let res = this.getCachedValue(key, userOpt);
         if (typeof res === 'undefined' && typeof div !== 'string') {
-            res = div.getAttribute(dataAttr(userOpt));
+            res = div.getAttribute(Utils.dataAttr(userOpt));
         }
         return this.toBool(res);
     },
@@ -2141,7 +2132,7 @@ const Renderer = {
         this.getSpinner(div);
         this.clearCurrentMol(key);
         const divAttrs = Object.fromEntries(this.allTags().map(
-            (tag) => [tag, div.getAttribute(dataAttr(tag))]
+            (tag) => [tag, div.getAttribute(Utils.dataAttr(tag))]
         ));
         let molDraw = this.getMolDraw(div);
         const { width, height } = this.getRoundedDivSize(div);
@@ -2255,7 +2246,7 @@ const Renderer = {
                 if (widthHeightTags.includes(tag)) {
                     return false;
                 }
-                const divAttrValue = div.getAttribute(dataAttr(tag));
+                const divAttrValue = div.getAttribute(Utils.dataAttr(tag));
                 const currentDivAttrValue = currentDivValue[tag];
                 return (typeof currentDivAttrValue !== 'undefined' && divAttrValue !== currentDivAttrValue);
             });

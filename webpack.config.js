@@ -33,6 +33,8 @@ const config = {
     plugins: [
         new DefinePlugin({
             PKG_VERSION: `'${version}'`,
+            // MINIMALLIB_PATH is relative to the src/StructureRenderer directory,
+            // which is where Renderer.js (which references MINIMALLIB_PATH) lives
             MINIMALLIB_PATH: `'${path.join("..", "..", "public", `RDKit_minimal.${version}.js`)}'`,
         }),
     ],
@@ -53,15 +55,31 @@ module.exports = () => {
                 "./src/index.js"
             ]
         },
-        /*
         experiments: {
             outputModule: true,
         },
-        */
         output: {
             path: path.resolve(__dirname, "dist"),
             publicPath: "",
             filename: "rdkit-structure-renderer-module.js",
+            library: {
+                type: "module",
+            },
+        },
+    };
+
+    const umdConfig = {
+        ...config,
+        entry: {
+            main: [
+                "core-js/stable",
+                "./src/index.js"
+            ]
+        },
+        output: {
+            path: path.resolve(__dirname, "dist"),
+            publicPath: "",
+            filename: "rdkit-structure-renderer-umd.js",
             library: {
                 type: "umd",
             },
@@ -98,8 +116,6 @@ module.exports = () => {
         ],
     };
 
-    // MINIMALLIB_PATH is relative to the src/StructureRenderer directory,
-    // which is where Renderer.js (which references MINIMALLIB_PATH )lives
     const nodeConfig = {
         ...config,
         entry: {
@@ -117,5 +133,5 @@ module.exports = () => {
         },
     };
 
-    return [ scriptConfig, moduleConfig, nodeConfig ];
+    return [ scriptConfig, moduleConfig, nodeConfig, umdConfig ];
 };

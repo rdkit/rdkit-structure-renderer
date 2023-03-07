@@ -32,7 +32,7 @@
 
 import { RDK_STR_RNR } from './constants';
 import ButtonTooltip from './ButtonTooltip';
-import { getElementCenter, getViewPortRect } from './utils';
+import Utils from './utils';
 
 /**
  * SettingsDialog class:
@@ -476,7 +476,7 @@ class SettingsDialog {
                 return;
             }
         }
-        const cogCenter = getElementCenter(this.buttons.cog);
+        const cogCenter = Utils.getElementCenter(this.buttons.cog);
         const dialogRect = this.dialog.getBoundingClientRect();
         if (!this._initialDialogRect) {
             this._initialDialogRect = {
@@ -548,7 +548,7 @@ class SettingsDialog {
         // if this is not a scrolling event, or it is and the dialog
         // has not scrolled as much as the cog button has, compute
         // the dialog position and set it
-        const viewPortRect = getViewPortRect();
+        const viewPortRect = Utils.getViewPortRect();
         const beforeNodeRect = this.dialogRelatives.beforeNode?.getBoundingClientRect()
             || viewPortRect;
         const topLeft = {

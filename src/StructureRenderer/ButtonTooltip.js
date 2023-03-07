@@ -30,7 +30,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-import { getElementCenter, getViewPortRect } from './utils';
+import Utils from './utils';
 
 /**
  * ButtonTooltip class:
@@ -134,8 +134,8 @@ class ButtonTooltip {
      */
     setPosition(parent, offsetIn) {
         const offset = offsetIn || { x: 0, y: 0 };
-        const parentCenter = getElementCenter(parent);
-        const viewPortRect = getViewPortRect();
+        const parentCenter = Utils.getElementCenter(parent);
+        const viewPortRect = Utils.getViewPortRect();
         const height = this._height + this.getYOffset();
         const minLeft = window.pageXOffset;
         const maxLeft = viewPortRect.width - 2 * this._halfWidth;

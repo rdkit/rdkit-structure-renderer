@@ -31,6 +31,7 @@
 //
 
 import Renderer from './StructureRenderer/Renderer';
+import Utils from './StructureRenderer/utils';
 
-export { Renderer };
+export { Renderer, Utils };
 export default Renderer;

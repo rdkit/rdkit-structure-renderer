@@ -30,14 +30,16 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-import {
+import Utils from './utils';
+
+const {
     extractBase64Pickle,
     getMolFromUInt8Array,
     getPickleSafe,
     isBase64Pickle,
     isMolBlock,
     splitScaffoldText,
-} from './utils';
+} = Utils;
 
 const Depiction = {
     extractBase64Pickle,

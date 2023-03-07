@@ -31,7 +31,7 @@
 //
 
 import Depiction from './Worker';
-import { getMinimalLibBasename } from './utils';
+import Utils from './utils';
 
 class Dispatcher {
     constructor(id, minimalLibPath) {
@@ -52,9 +52,9 @@ class Dispatcher {
             // PKG_VERSION is a string literal which is replaced at compile time
             // by webpack.DefinePlugin, so we can silence linter warnings
             /* eslint-disable indent, no-undef */
-`importScripts('${minimalLibPath}/${getMinimalLibBasename()}.${PKG_VERSION}.js');
+`importScripts('${minimalLibPath}/${Utils.getMinimalLibBasename()}.${PKG_VERSION}.js');
 const rdkitReady = initRDKitModule({
-    locateFile: () => '${minimalLibPath}/${getMinimalLibBasename()}.${PKG_VERSION}.wasm',
+    locateFile: () => '${minimalLibPath}/${Utils.getMinimalLibBasename()}.${PKG_VERSION}.wasm',
 });
 const Depiction = {${Object.keys(Depiction).map((k) => `${k}: ${Depiction[k]}`).join(',')}};
 

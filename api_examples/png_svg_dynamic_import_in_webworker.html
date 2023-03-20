@@ -9,7 +9,7 @@
         <div id="molSvg"></div>
         <script>
             let path = window.location.toString();
-            path = path.substring(0, path.lastIndexOf('/'));
+            path = path.substring(0, path.lastIndexOf('/api_examples'));
             const depict = (path) => {
                 const rsrModulePath = `${path}/dist/rdkit-structure-renderer-module.js`;
                 const minimalLibPath = `${path}/public`;

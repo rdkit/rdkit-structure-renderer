@@ -36,9 +36,12 @@ const DEFAULT_DRAW_OPTS = {
 
 const DEFAULT_IMG_OPTS = {
     scaleFac: 1,
+    copyImgScaleFac: 2,
     width: 300,
     height: 200,
 };
+
+const NATIVE_CANVAS_RESOLUTION = 96;
 
 const RDK_STR_RNR = 'rdk-str-rnr-';
 
@@ -100,6 +103,7 @@ const WHL_OPTS = {
 export {
     DEFAULT_DRAW_OPTS,
     DEFAULT_IMG_OPTS,
+    NATIVE_CANVAS_RESOLUTION,
     RDK_STR_RNR,
     DIVID_SEPARATOR,
     DIV_ATTRS,

@@ -31,6 +31,7 @@
 //
 
 import { v4 as uuidv4 } from 'uuid';
+import { changeDpiBlob } from 'changedpi';
 import defaultRendererCss from './style';
 import defaultDialogHtml from './dialog';
 import defaultIcons from './icons';
@@ -41,6 +42,7 @@ import SettingsDialog from './SettingsDialog';
 import ButtonTooltip from './ButtonTooltip';
 import Utils from './utils';
 import {
+    NATIVE_CANVAS_RESOLUTION,
     DEFAULT_IMG_OPTS,
     DEFAULT_DRAW_OPTS,
     RDK_STR_RNR,
@@ -1071,52 +1073,47 @@ const Renderer = {
      * value of specific userOpts, match, width, height, scaleFac,
      * transparency.
      * @param {Object|null} drawOpts input drawing options
-     * @param {Object|null} userOpts user options
+     * @param {Object|null} userOpts user rendering options
      * @param {Object|null} match match object
      * @param {number|null} width image width
      * @param {number|null} height image height
-     * @param {number|null} scaleFac image scaling factor
      * @param {boolean|null} transparent whether background should be transparent
      * @returns {object} overridden drawOpts
      */
     overrideDrawOpts({
-        drawOpts, userOpts, match, width, height, scaleFac, transparent
+        drawOpts, userOpts, match, width, height, transparent
     }) {
         userOpts = userOpts || {};
         width = width || DEFAULT_IMG_OPTS.width;
         height = height || DEFAULT_IMG_OPTS.height;
-        scaleFac = scaleFac || DEFAULT_IMG_OPTS.scaleFac;
         match = match || {};
         if (typeof transparent === 'undefined') {
             transparent = !this.getIsLegacyBrowser();
         }
-        drawOpts = { ...this.getDefaultDrawOpts(), ...(drawOpts || {}) };
+        const drawOptsOut = { ...this.getDefaultDrawOpts(), ...(drawOpts || {}) };
         if (typeof userOpts.USE_MOLBLOCK_WEDGING === 'boolean' && userOpts.USE_MOLBLOCK_WEDGING) {
-            Object.assign(drawOpts, {
+            Object.assign(drawOptsOut, {
                 useMolBlockWedging: true,
                 wedgeBonds: false,
                 addChiralHs: false,
             });
         }
         if (userOpts.SCAFFOLD_HIGHLIGHT && match) {
-            Object.assign(drawOpts, match);
+            Object.assign(drawOptsOut, match);
         } else {
-            delete drawOpts.atoms;
-            delete drawOpts.bonds;
+            delete drawOptsOut.atoms;
+            delete drawOptsOut.bonds;
         }
-        drawOpts.addAtomIndices = userOpts.ATOM_IDX || false;
-        if (drawOpts.fixedBondLength) {
-            drawOpts.fixedBondLength *= scaleFac;
-        }
-        drawOpts.width = Math.round(width * scaleFac);
-        drawOpts.height = Math.round(height * scaleFac);
-        if (!drawOpts.backgroundColour) {
-            drawOpts.backgroundColour = [1, 1, 1, 1];
+        drawOptsOut.addAtomIndices = userOpts.ATOM_IDX || false;
+        drawOptsOut.width = width;
+        drawOptsOut.height = height;
+        if (!drawOptsOut.backgroundColour) {
+            drawOptsOut.backgroundColour = [1, 1, 1, 1];
         }
         if (transparent) {
-            drawOpts.backgroundColour[3] = 0;
+            drawOptsOut.backgroundColour[3] = 0;
         }
-        return drawOpts;
+        return drawOptsOut;
     },
 
     /**
@@ -1153,7 +1150,8 @@ const Renderer = {
                 drawOpts = this.overrideDrawOpts({
                     drawOpts, userOpts, width, height, transparent
                 });
-                res = await this.getPickledMolAndMatch(divId, molText, scaffoldText, { drawOpts, ...userOpts }) || {};
+                res = await this.getPickledMolAndMatch(
+                    divId, molText, scaffoldText, { drawOpts, ...userOpts }) || {};
             }
             const {
                 pickle, match, wasRebuilt, useMolBlockWedging
@@ -1261,8 +1259,7 @@ const Renderer = {
      * @param {UInt8Array} pickle
      * @param {Array} formatsIn optional, array with formats that
      * should be retrieved ('molblock', 'smiles', 'inchi')
-     * @param {boolean} useMolBlockWedging whether the molblock should
-     * be generated using original CTAB wedging information
+     * @param {object} userOpts user rendering options
      * @returns {object} dictionary with chemical representations
      */
     async getChemFormatsFromPickle(pickle, formatsIn, userOpts) {
@@ -1388,8 +1385,8 @@ const Renderer = {
      */
     async getImageFromDivIdOrKey(divIdOrKey, opts) {
         let res = null;
-        const divId = this.getFirstDivIdFromDivIdOrKey(divIdOrKey);
-        const key = this.getCacheKey(divId || divIdOrKey);
+        const divId = this.getFirstDivIdFromDivIdOrKey(divIdOrKey) || divIdOrKey;
+        const key = this.getCacheKey(divId);
         const { mol, match } = await this.getMolAndMatchForKey(key) || {};
         if (mol) {
             try {
@@ -1397,6 +1394,8 @@ const Renderer = {
                 optsCopy.match = optsCopy.match || match;
                 const div = this.getMolDiv(divId);
                 const userOpts = this.getUserOptsForDiv(div || divId) || {};
+                const useMolBlockWedging = this.shouldUseMolBlockWedging(mol, userOpts);
+                userOpts.USE_MOLBLOCK_WEDGING = useMolBlockWedging;
                 const drawOpts = this.getDrawOpts(div || divId);
                 optsCopy.userOpts = { ...userOpts, ...optsCopy.userOpts };
                 optsCopy.drawOpts = { ...drawOpts, ...optsCopy.drawOpts };
@@ -1411,46 +1410,74 @@ const Renderer = {
     },
 
     /**
+     * Return the scaled blob.
+     * If scaleFac is null or 1, the input blob is returned unchanged.
+     * @param {Blob} blob input blob
+     * @param {number} scaleFac (can be null)
+     * @returns Promise that resolves to scaled blob
+     */
+    scaleBlob(blob, scaleFac) {
+        if (typeof blob !== 'object' || !blob.arrayBuffer
+            || typeof scaleFac !== 'number' || scaleFac <= 1) {
+            return Promise.resolve(blob);
+        }
+        const dpi = NATIVE_CANVAS_RESOLUTION * scaleFac;
+        return changeDpiBlob(blob, dpi);
+    },
+
+    /**
      * Dumps the canvas content to a base64-encoded PNG string.
      * @param {Canvas|OffscreenCanvas} canvas
-     * @returns {string} base64-encoded PNG
+     * @param {number} scaleFac scaling factor (can be null)
+     * @returns {Promise} promise that resolves to base64-encoded PNG
+     * or null if error
      */
-    async toDataURL(canvas) {
-        if (typeof canvas.toDataURL === 'function') {
-            return canvas.toDataURL();
+    async toDataURL(canvas, scaleFac) {
+        const blob = await this.toBlob(canvas, scaleFac);
+        if (!blob) {
+            return Promise.resolve(null);
         }
-        if (typeof FileReaderSync !== 'undefined') {
-            const blob = await this.toBlob(canvas);
-            if (blob && typeof FileReaderSync !== 'undefined') {
-                // eslint-disable-next-line no-undef
-                return new FileReaderSync().readAsDataURL(blob);
-            }
-        }
-        return null;
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            const failedToDecode = () => {
+                console.error('Failed to decode image blob to base64 dataURL');
+                resolve(null);
+            };
+            reader.onerror = failedToDecode;
+            reader.onabort = failedToDecode;
+            reader.readAsDataURL(blob);
+        });
     },
 
     /**
      * Dumps the canvas content to a PNG Blob.
      * @param {Canvas|OffscreenCanvas} canvas
-     * @returns {Blob} PNG Blob
+     * @param {number} scaleFac scaling factor (can be null)
+     * @returns {Promise} Promise that resolves to PNG Blob
      */
-    toBlob(canvas) {
+    toBlob(canvas, scaleFac) {
         if (typeof canvas.toBlob === 'function') {
             return new Promise((resolve) => {
-                canvas.toBlob((img) => resolve(img));
+                canvas.toBlob((img) => {
+                    resolve(this.scaleBlob(img, scaleFac));
+                });
             });
         }
         if (typeof canvas.convertToBlob === 'function') {
-            return canvas.convertToBlob();
+            return canvas.convertToBlob().then((img) => this.scaleBlob(img, scaleFac));
         }
         return null;
     },
 
     /**
      * Get an image with the 2D structure associated to the passed JSMol.
+     * If opts.format is an array of formats, a dictionary object
+     * { format: image } is returned.
      * @param {JSMol} mol RDKitJS molecule
      * @param {object} opts optional dictionary with drawing options:
-     * - format: 'png', 'base64png' or 'svg', defaults to 'png'
+     * - format: can either be a single string or an array of strings.
+     *   Supported formats are 'png', 'base64png' or 'svg'; defaults to 'png'.
      * - transparent: transparent background, defaults to true
      * - width: image width, defaults to the current div width (if any)
      * - height: image height, defaults to the current div height (if any)
@@ -1458,24 +1485,33 @@ const Renderer = {
      * - match: match object, defaults to the current div match
      * - userOpts: user settings, defaults to the current div settings
      * - drawOpts: RDKit drawOpts, defaults to the current div drawOpts
-     * @returns {string|Blob} a string if format is either 'svg' or 'base64png',
-     * otherwise a Blob
+     * @returns {string|Blob|object} if opts.format is a string, the return type
+     * is a string if format is either 'svg' or 'base64png', otherwise a Blob.
+     * If opts.format is an array of format string, the return type is an object
+     * relating format string to the respective image.
      */
     async getImageFromMol(mol, opts) {
         if (!mol) {
             return null;
         }
         const { format, userOpts } = opts;
-        const isSvg = (format === 'svg');
-        const isBase64Png = (format === 'base64png');
-        let image = null;
+        let shouldReturnObject = false;
+        const imageDict = {};
+        let formatArray;
+        if (Array.isArray(format)) {
+            shouldReturnObject = true;
+            formatArray = format;
+        } else {
+            formatArray = [format || 'png'];
+        }
         if (userOpts?.ABBREVIATE) {
             mol.condense_abbreviations();
         }
-        const drawOpts = this.overrideDrawOpts({ ...opts, scaleFac: this.copyImgScaleFac });
-        if (isSvg) {
+        const scaleFac = opts.scaleFac || 1;
+        const drawOpts = this.overrideDrawOpts(opts);
+        if (formatArray.includes('svg')) {
             try {
-                image = this.write2DLayout(mol, drawOpts);
+                imageDict.svg = this.write2DLayout(mol, drawOpts);
             } catch (e) {
                 console.error(`Failed to generate SVG image (${e})`);
             }
@@ -1483,7 +1519,6 @@ const Renderer = {
             let canvas;
             if (haveWindow) {
                 canvas = document.createElement('canvas');
-                this.resizeMolDraw(canvas, drawOpts.width, drawOpts.height, 1);
             } else if (typeof OffscreenCanvas !== 'undefined') {
                 canvas = new OffscreenCanvas(drawOpts.width, drawOpts.height);
             } else {
@@ -1491,10 +1526,19 @@ const Renderer = {
             }
             if (canvas) {
                 try {
+                    this.resizeMolDraw(canvas, drawOpts.width, drawOpts.height, scaleFac);
                     if (this.write2DLayout(mol, drawOpts, canvas) !== null) {
-                        image = isBase64Png ? await this.toDataURL(canvas) : await this.toBlob(canvas);
-                        if (!image) {
-                            console.error('Failed to generate PNG image');
+                        if (formatArray.includes('base64png')) {
+                            imageDict.base64png = await this.toDataURL(canvas, scaleFac);
+                            if (!imageDict.base64png) {
+                                console.error('Failed to generate base64-encoded PNG image');
+                            }
+                        }
+                        if (formatArray.includes('png')) {
+                            imageDict.png = await this.toBlob(canvas, scaleFac);
+                            if (!imageDict.png) {
+                                console.error('Failed to generate binary PNG image');
+                            }
                         }
                     }
                 } catch (e) {
@@ -1502,7 +1546,7 @@ const Renderer = {
                 }
             }
         }
-        return image;
+        return shouldReturnObject ? imageDict : imageDict[formatArray[0]];
     },
 
     /**
@@ -1551,7 +1595,7 @@ const Renderer = {
      * based on desired user visualization options and the presence
      * of coordinates on the molecule.
      * @param {JSMol} mol RDKitJS molecule
-     * @param {Object} userOpts user options
+     * @param {object} userOpts user rendering options
      * @returns {boolean} whether useMolBlockWedging should be set to true
      */
     shouldUseMolBlockWedging: (mol, userOpts) => {
@@ -1579,10 +1623,30 @@ const Renderer = {
     },
 
     /**
+     * Prefix an image with MIME type for being put to clipboard as HTML.
+     * Unrecognized types are returned unchanged.
+     * @param {string} image string image description
+     * @param {string} format image format (currently, base64png only)
+     * @param {string} molBlock molBlock (can be null)
+     * @param {number} width image width (can be null)
+     * @param {number} height image height (can be null)
+     * @returns {string} image formatted for clipboard
+     */
+    formatImageTextHtml(image, format, { molBlock, width, height }) {
+        const size = (width && height ? ` width="${width}px" height="${height}px"` : '');
+        const isSvg = (format === 'svg');
+        if (isSvg || format === 'base64png') {
+            const srcImage = (isSvg ? `data:image/svg+xml,${encodeURIComponent(image)}` : image);
+            return `<img alt="${molBlock || ''}" src="${srcImage}"${size}>`;
+        }
+        return image;
+    },
+
+    /**
      * Put some content from a given div on the clipboard.
      * @param {Element} div
-     * @param {Array<String>} formats array of formats
-     * to be copied to clipboard ('png', 'svg', 'molblock')
+     * @param {Array<string>} formats array of formats
+     * to be copied to clipboard ('png', 'svg', 'molblock', 'base64png')
      */
     async putClipboardItem(div, formats) {
         let molMatch = {};
@@ -1596,40 +1660,78 @@ const Renderer = {
             if (!mol) {
                 this.logClipboardError();
             } else {
-                const hasPng = formats.includes('png');
-                const hasSvg = formats.includes('svg');
                 const content = {};
-                if (formats.includes('molblock')) {
-                    const type = 'text/plain';
-                    const useMolBlockWedging = this.shouldUseMolBlockWedging(mol, userOpts);
-                    const molBlockParams = this.getMolblockParams(useMolBlockWedging);
-                    const molblock = Utils.getMolblockFromMol(mol, molBlockParams);
-                    content[type] = new Blob([molblock], { type });
+                const clipboardDict = {};
+                const formatSet = new Set();
+                let molblockToClipboard = false;
+                // svg, base64png and molblock are all text/plain, so we can't have all
+                // priority is svg > base64png > molblock
+                let plainTextIdx = -1;
+                ['svg', 'base64png', 'molblock'].every((fmt) => {
+                    plainTextIdx = formats.indexOf(fmt);
+                    return plainTextIdx === -1;
+                });
+                let needMolBlock = formats.includes('molblock');
+                if (formats.includes('png')) {
+                    formatSet.add('png');
+                    formatSet.add('base64png');
+                    needMolBlock = true;
                 }
-                if (hasPng || hasSvg) {
-                    const { width, height } = this.getRoundedDivSize(div);
-                    const opts = {
-                        width,
-                        height,
-                        // if both svg and png were specified, png is ignored
-                        format: (hasSvg ? 'svg' : 'png'),
-                        match,
-                        drawOpts,
-                        userOpts,
-                    };
-                    const image = await this.getImageFromMol(mol, opts);
-                    if (!image) {
-                        this.logClipboardError();
-                    } else if (hasSvg) {
-                        // at the moment svg+xml MIME type is not supported by browsers
-                        // so we copy as plain text. This means SVG text will clobber molblock
-                        if (typeof image === 'string') {
+                let molBlock;
+                if (needMolBlock) {
+                    const useMolBlockWedging = this.shouldUseMolBlockWedging(mol, userOpts);
+                    userOpts.USE_MOLBLOCK_WEDGING = useMolBlockWedging;
+                    const molBlockParams = this.getMolblockParams(useMolBlockWedging);
+                    molBlock = Utils.getMolblockFromMol(mol, molBlockParams);
+                }
+                const textFormat = (plainTextIdx !== -1 ? formats[plainTextIdx] : null);
+                if (textFormat) {
+                    if (textFormat === 'molblock') {
+                        clipboardDict[textFormat] = molBlock;
+                        molblockToClipboard = true;
+                    } else {
+                        formatSet.add(textFormat);
+                    }
+                }
+                const format = Array.from(formatSet);
+                const { width, height } = this.getRoundedDivSize(div);
+                const scaleFac = this.copyImgScaleFac;
+                const opts = {
+                    width,
+                    height,
+                    match,
+                    format,
+                    scaleFac,
+                    drawOpts,
+                    userOpts,
+                };
+                Object.assign(clipboardDict, await this.getImageFromMol(mol, opts));
+                let msg = '';
+                Object.entries(clipboardDict).forEach(([fmt, image]) => {
+                    if (image) {
+                        const isBinaryImage = (typeof image !== 'string');
+                        if (!isBinaryImage && !(fmt === 'base64png' && molblockToClipboard)) {
                             const type = 'text/plain';
-                            content[type] = new Blob([image], { type });
+                            const imageForClipboard = this.formatImageTextHtml(
+                                image, fmt, { width, height });
+                            content[type] = Promise.resolve(new Blob([imageForClipboard], { type }));
+                        } else if (isBinaryImage) {
+                            const type = 'image/png';
+                            const imageForClipboard = image;
+                            content[type] = Promise.resolve(new Blob([imageForClipboard], { type }));
+                        }
+                        if (fmt === 'base64png') {
+                            const type = 'text/html';
+                            const imageForClipboard = this.formatImageTextHtml(
+                                image, fmt, { molBlock, width, height });
+                            content[type] = Promise.resolve(new Blob([imageForClipboard], { type }));
                         }
                     } else {
-                        content['image/png'] = image;
+                        msg += `Failed to generate ${fmt} image`;
                     }
+                });
+                if (msg) {
+                    this.logClipboardError(msg);
                 }
                 if (Object.keys(content).length) {
                     await this.putClipboardContent(content);
@@ -1814,7 +1916,7 @@ const Renderer = {
         if (!(width > 0 && height > 0)) {
             return;
         }
-        if (molDraw.nodeName === 'CANVAS') {
+        if (molDraw.getContext || molDraw.nodeName === 'CANVAS') {
             molDraw.width = width * scale;
             molDraw.height = height * scale;
             const ctx = molDraw.getContext('2d');
@@ -1822,7 +1924,9 @@ const Renderer = {
                 ctx.scale(scale, scale);
             }
         }
-        molDraw.setAttribute('style', `width: ${width}px; height: ${height}px;`);
+        if (molDraw.setAttribute) {
+            molDraw.setAttribute('style', `width: ${width}px; height: ${height}px;`);
+        }
     },
 
     /**
@@ -2298,7 +2402,7 @@ const Renderer = {
     /**
      * Current scaling factor used for images copied to clipboard.
      */
-    copyImgScaleFac: DEFAULT_IMG_OPTS.scaleFac,
+    copyImgScaleFac: DEFAULT_IMG_OPTS.copyImgScaleFac,
 };
 
 export default Renderer;

@@ -68,7 +68,7 @@ class SettingsDialog {
      * as a PNG image.
      */
     async onCopyPNG() {
-        await this.renderer.putClipboardItem(this.molDiv, ['png']);
+        await this.renderer.putClipboardItem(this.molDiv, ['png', 'base64png']);
     }
 
     /**
@@ -304,7 +304,7 @@ class SettingsDialog {
         const scaleInput = this.dialog.querySelector(`input[id^=${RDK_STR_RNR}scalefac`);
         if (scaleInput) {
             scaleInput.onchange = (e) => {
-                this.renderer.copyImgScaleFac = e.target.value;
+                this.renderer.copyImgScaleFac = parseInt(e.target.value, 10);
             };
         }
         this.dialog.querySelectorAll(`[id^=${RDK_STR_RNR}formats-]`).forEach(

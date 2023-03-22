@@ -30,7 +30,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-import { RDK_STR_RNR } from './constants';
+import { RDK_STR_RNR, DEFAULT_IMG_OPTS } from './constants';
 
 const html =
 `<div class="${RDK_STR_RNR}dialog">
@@ -65,7 +65,7 @@ const html =
                     <button type="button" class="copy" id="${RDK_STR_RNR}copy-svg"></button>
                 </label></td>
                 <td class="scalecell"><span class="label">&times;</span>
-                    <input class="scale" type="number" id="${RDK_STR_RNR}scalefac" value="1" min="1" max="9" step="1"/></td>
+                    <input class="scale" type="number" id="${RDK_STR_RNR}scalefac" value="${DEFAULT_IMG_OPTS.copyImgScaleFac}" min="1" max="9" step="1"/></td>
             </tr>
         </table>
     </div>

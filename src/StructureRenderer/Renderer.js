@@ -1550,6 +1550,47 @@ const Renderer = {
     },
 
     /**
+     * Write the 2D structure associated to the passed molText to an HTML5 canvas.
+     * @param {string} molText molecule description (SMILES, molblock or pkl_base64)
+     * @param {string|null} scaffoldText scaffold description (SMILES, molblock or pkl_base64).
+     * Note that the description may include multiple scaffolds, either separated by
+     * a pipe symbol ('|', SMILES and pkl_base64) or by the SDF terminator ('$$$$', molblock).
+     * @param {object} opts optional dictionary with drawing options:
+     * - transparent: transparent background, defaults to true
+     * - width: image width, defaults to the current div width (if any)
+     * - height: image height, defaults to the current div height (if any)
+     * - scaleFac: image scale factor, defaults to the current scale factor
+     * - match: match object, defaults to the current div match
+     * - userOpts: user settings, defaults to the current div settings
+     * - drawOpts: RDKit drawOpts, defaults to the current div drawOpts
+     * @returns {boolean} true if success, false if failure
+     */
+    async molTextToCanvas(molText, scaffoldText, opts, canvas) {
+        const uniqueId = uuidv4();
+        let { userOpts } = opts;
+        userOpts = userOpts || {};
+        const res = await this.getPickledMolAndMatch(uniqueId, molText, scaffoldText, userOpts) || {};
+        const { pickle, match, useMolBlockWedging } = res;
+        if (pickle) {
+            userOpts.USE_MOLBLOCK_WEDGING = useMolBlockWedging || false;
+            Object.assign(opts, { userOpts, match });
+            const mol = await this.getMolFromPickle(pickle);
+            if (mol) {
+                try {
+                    if (mol.is_valid()) {
+                        const drawOpts = this.overrideDrawOpts(opts);
+                        this.resizeMolDraw(canvas, drawOpts.width, drawOpts.height, opts.scaleFac);
+                        return !!this.write2DLayout(mol, drawOpts, canvas);
+                    }
+                } finally {
+                    mol.delete();
+                }
+            }
+        }
+        return false;
+    },
+
+    /**
      * Get an image with the 2D structure associated to the passed molText.
      * @param {string} molText molecule description (SMILES, molblock or pkl_base64)
      * @param {string|null} scaffoldText scaffold description (SMILES, molblock or pkl_base64).
@@ -1925,7 +1966,8 @@ const Renderer = {
             }
         }
         if (molDraw.setAttribute) {
-            molDraw.setAttribute('style', `width: ${width}px; height: ${height}px;`);
+            molDraw.style.width = `${width}px`;
+            molDraw.style.height = `${height}px;`;
         }
     },
 

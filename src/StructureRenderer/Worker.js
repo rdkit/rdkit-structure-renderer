@@ -76,7 +76,8 @@ const Depiction = {
                 opIdx = -1;
             }
             try {
-                mol = rdkitModule.get_mol(molText, JSON.stringify(opts));
+                mol = opts.query ? rdkitModule.get_qmol(molText)
+                    : rdkitModule.get_mol(molText, JSON.stringify(opts));
             } catch (e) {
                 exc = ` (${e})`;
             }
@@ -215,6 +216,10 @@ const Depiction = {
         opts,
     }) {
         const optsLocal = opts || {};
+        let { drawOpts, molOpts, scaffoldOpts } = optsLocal;
+        drawOpts = drawOpts || {};
+        molOpts = molOpts || {};
+        scaffoldOpts = scaffoldOpts || {};
         let rebuild = false;
         const pickle = new Uint8Array();
         let match = null;
@@ -251,7 +256,7 @@ const Depiction = {
         };
         if (type) {
             if (molText) {
-                mol = this.getMolSafe(rdkitModule, molText);
+                mol = this.getMolSafe(rdkitModule, molText, molOpts);
             } else if (molPickle) {
                 mol = this.getMolFromUInt8Array(rdkitModule, molPickle);
             }
@@ -260,8 +265,6 @@ const Depiction = {
             try {
                 rebuild = !mol.has_coords();
                 const abbreviate = optsLocal.ABBREVIATE;
-                let { drawOpts } = optsLocal;
-                drawOpts = drawOpts || {};
                 const { width, height } = drawOpts;
                 const canonicalizeDir = (typeof width === 'number'
                     && typeof height === 'number' && width < height ? -1 : 1);
@@ -307,10 +310,7 @@ const Depiction = {
                     const scaffoldTextArray = this.splitScaffoldText(scaffoldText);
                     const scaffoldIteratorArray = [];
                     scaffoldTextArray.every((maybeMultiScaffoldText) => {
-                        let scaffold = this.getMolSafe(rdkitModule, maybeMultiScaffoldText, {
-                            removeHs: false,
-                            mergeQueryHs: true,
-                        });
+                        let scaffold = this.getMolSafe(rdkitModule, maybeMultiScaffoldText, scaffoldOpts);
                         if (scaffold && !scaffold.is_valid()) {
                             scaffold.delete();
                             scaffold = null;

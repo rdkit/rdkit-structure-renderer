@@ -45,6 +45,8 @@ import {
     NATIVE_CANVAS_RESOLUTION,
     DEFAULT_IMG_OPTS,
     DEFAULT_DRAW_OPTS,
+    DEFAULT_MOL_OPTS,
+    DEFAULT_SCAFFOLD_OPTS,
     RDK_STR_RNR,
     DIVID_SEPARATOR,
     DIV_ATTRS,
@@ -120,6 +122,22 @@ const Renderer = {
         await this.init();
         return _RDKitModule;
     },
+
+    /**
+     * Override to use custom default get_mol options
+     * for the molecule.
+     * @returns {object} default get_mol options
+     * for the molecule
+     */
+    getDefaultMolOpts: () => DEFAULT_MOL_OPTS,
+
+    /**
+     * Override to use custom default get_mol options
+     * for the scaffold.
+     * @returns {object} default get_mol options
+     * for the scaffold
+     */
+    getDefaultScaffoldOpts: () => DEFAULT_SCAFFOLD_OPTS,
 
     /**
      * Override to use custom default drawing options.
@@ -903,28 +921,33 @@ const Renderer = {
     },
 
     /**
-     * For a given div, set an HTML tag to a JSOn-encoded
-     * key: value dictionary. If the dictionary is empty,
-     * the HTML tag is removed from the div.
-     * @param {Element} div
-     * @param {string} opt HTML tag name
-     * @param {object} value key: value dictionary
+     * For a given div or divId, get the get_mol options for the molecule
+     * encoded as a JSON string. The get_mol options which are not defined
+     * in the div are replaced by default values.
+     * @param {Element|string} div div or divId
+     * @returns {object} get_mol options as a key: value dictionary
      */
-    setJsonOpt(div, opt, value) {
-        let jsonValue = null;
-        const attr = Utils.dataAttr(opt);
-        if (value) {
-            try {
-                jsonValue = JSON.stringify(value);
-            } catch (e) {
-                jsonValue = null;
-            }
+    getMolOpts(div) {
+        const res = { ...this.getDefaultMolOpts() };
+        if (typeof div === 'object') {
+            Object.assign(res, this.getJsonOpt(div, this.getDivAttrs().MOL_OPTS) || {});
         }
-        if (jsonValue) {
-            div.setAttribute(attr, jsonValue);
-        } else {
-            div.removeAttribute(attr);
+        return res;
+    },
+
+    /**
+     * For a given div or divId, get the get_mol options for the scaffold
+     * encoded as a JSON string. The get_mol options which are not defined
+     * in the div are replaced by default values.
+     * @param {Element|string} div div or divId
+     * @returns {object} get_mol options as a key: value dictionary
+     */
+    getScaffoldOpts(div) {
+        const res = { ...this.getDefaultScaffoldOpts() };
+        if (typeof div === 'object') {
+            Object.assign(res, this.getJsonOpt(div, this.getDivAttrs().SCAFFOLD_OPTS) || {});
         }
+        return res;
     },
 
     /**
@@ -940,35 +963,6 @@ const Renderer = {
             Object.assign(res, this.getJsonOpt(div, this.getDivAttrs().DRAW_OPTS) || {});
         }
         return res;
-    },
-
-    /**
-     * For a given div, set the draw options encoded as
-     * a JSON string. Only the draw options that differ from
-     * the default values are stored in the div.
-     * @param {Element} div
-     * @param {object} opts options as a key: value dictionary
-     */
-    setDrawOpts(div, opts) {
-        let haveNonDefaultOpts = false;
-        const nonDefaultOpts = Object.fromEntries(Object.entries(opts).filter(([k, v]) => {
-            const defaultValue = this.getDefaultDrawOpt(k);
-            const noDefaultValue = (typeof defaultValue === 'undefined');
-            const isDefaultOpt = ((noDefaultValue && v) || (!noDefaultValue && defaultValue !== v));
-            haveNonDefaultOpts |= isDefaultOpt;
-            return isDefaultOpt;
-        }));
-        this.setJsonOpt(div, this.getDivAttrs().DRAW_OPTS, haveNonDefaultOpts ? nonDefaultOpts : null);
-    },
-
-    /**
-     * For a given div, set the value of an option.
-     * @param {Element} div
-     * @param {string}  opt HTML tag name holding the option value
-     * @param {boolean} value
-     */
-    setDivOpt(div, opt, value) {
-        div.setAttribute(Utils.dataAttr(opt), !!value);
     },
 
     /**
@@ -1140,6 +1134,8 @@ const Renderer = {
             // get the HTML element where we are going to draw
             const molDraw = this.getMolDraw(div);
             const userOpts = this.getUserOptsForDiv(div);
+            const molOpts = this.getMolOpts(div);
+            const scaffoldOpts = this.getScaffoldOpts(div);
             let drawOpts = this.getDrawOpts(div);
             const key = this.getCacheKey(div);
             let res = this.getCurrentMol(key);
@@ -1151,7 +1147,9 @@ const Renderer = {
                     drawOpts, userOpts, width, height, transparent
                 });
                 res = await this.getPickledMolAndMatch(
-                    divId, molText, scaffoldText, { drawOpts, ...userOpts }) || {};
+                    divId, molText, scaffoldText, {
+                        drawOpts, molOpts, scaffoldOpts, ...userOpts
+                    }) || {};
             }
             const {
                 pickle, match, wasRebuilt, useMolBlockWedging
@@ -1562,14 +1560,20 @@ const Renderer = {
      * - scaleFac: image scale factor, defaults to the current scale factor
      * - match: match object, defaults to the current div match
      * - userOpts: user settings, defaults to the current div settings
+     * - molOpts: RDKit get_mol opts, defaults to the current div settings
      * - drawOpts: RDKit drawOpts, defaults to the current div drawOpts
      * @returns {boolean} true if success, false if failure
      */
     async molTextToCanvas(molText, scaffoldText, opts, canvas) {
         const uniqueId = uuidv4();
-        let { userOpts } = opts;
+        let { userOpts, molOpts, scaffoldOpts } = opts;
         userOpts = userOpts || {};
-        const res = await this.getPickledMolAndMatch(uniqueId, molText, scaffoldText, userOpts) || {};
+        molOpts = molOpts || {};
+        scaffoldOpts = scaffoldOpts || {};
+        const res = await this.getPickledMolAndMatch(
+            uniqueId, molText, scaffoldText, {
+                ...userOpts, molOpts, scaffoldOpts
+            }) || {};
         const { pickle, match, useMolBlockWedging } = res;
         if (pickle) {
             userOpts.USE_MOLBLOCK_WEDGING = useMolBlockWedging || false;
@@ -1610,9 +1614,14 @@ const Renderer = {
      */
     async getImageFromMolText(molText, scaffoldText, opts) {
         const uniqueId = uuidv4();
-        let { userOpts } = opts;
+        let { userOpts, molOpts, scaffoldOpts } = opts;
         userOpts = userOpts || {};
-        const res = await this.getPickledMolAndMatch(uniqueId, molText, scaffoldText, userOpts) || {};
+        molOpts = molOpts || {};
+        scaffoldOpts = scaffoldOpts || {};
+        const res = await this.getPickledMolAndMatch(
+            uniqueId, molText, scaffoldText, {
+                ...userOpts, molOpts, scaffoldOpts
+            }) || {};
         const { pickle, match, useMolBlockWedging } = res;
         if (!pickle) {
             return null;
@@ -1622,7 +1631,7 @@ const Renderer = {
         let image = null;
         if (opts.format === 'svg') {
             const drawOpts = this.overrideDrawOpts(opts);
-            const svgRes = await this.requestSvg(uniqueId, pickle, { drawOpts, ...userOpts });
+            const svgRes = await this.requestSvg(uniqueId, pickle, { drawOpts, ...userOpts, molOpts });
             image = svgRes?.svg;
         } else {
             const mol = await this.getMolFromPickle(pickle);

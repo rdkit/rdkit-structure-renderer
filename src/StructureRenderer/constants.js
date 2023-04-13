@@ -34,6 +34,13 @@ const DEFAULT_DRAW_OPTS = {
     backgroundColour: [1, 1, 1, 1]
 };
 
+const DEFAULT_MOL_OPTS = {};
+
+const DEFAULT_SCAFFOLD_OPTS = {
+    removeHs: false,
+    mergeQueryHs: true,
+};
+
 const DEFAULT_IMG_OPTS = {
     scaleFac: 1,
     copyImgScaleFac: 2,
@@ -53,6 +60,8 @@ const DIV_ATTRS = [
     'MOL',
     'SCAFFOLD',
     'DRAW_OPTS',
+    'MOL_OPTS',
+    'SCAFFOLD_OPTS',
     'PARENT_NODE',
     'BEFORE_NODE',
     'SCROLLING_NODE',
@@ -102,6 +111,8 @@ const WHL_OPTS = {
 
 export {
     DEFAULT_DRAW_OPTS,
+    DEFAULT_MOL_OPTS,
+    DEFAULT_SCAFFOLD_OPTS,
     DEFAULT_IMG_OPTS,
     NATIVE_CANVAS_RESOLUTION,
     RDK_STR_RNR,

@@ -303,7 +303,7 @@ const Depiction = {
                     const canonicalizeScaffoldStored = behavior.SCAFFOLD_CANONICALIZE ? canonicalizeDir : 0;
                     match = null;
                     // if we do not recompute 2D coordinates, we only do a rigid-body rotation
-                    const alignOnly = !optsLocal.RECOMPUTE2D;
+                    const alignOnly = !(optsLocal.RECOMPUTE2D || rebuild);
                     // scaffoldText can be a pipe-separated string of SMILES
                     // or a $$$$-separated string of molblocks. Each scaffold can in turn
                     // be constituted by mutliple disconnected fragments.

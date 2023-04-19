@@ -2,10 +2,10 @@
 <html>
     <head>
         <meta charset="utf-8" />
-        <title>StructureRenderer API example - generate SVG using bundle</title>
+        <title>StructureRenderer API example - generate PNG using bundle</title>
     </head>
     <body>
-        <div id="molSvg"></div>
+        <div id="molPng"></div>
         <script id="rendererBundle"></script>
         <script>
             var defaultDrawOpts = {
@@ -56,7 +56,7 @@
                     renderer.init(unpkgMinimalLibPath).then(function(r) {
                         r.getImageFromMolText(molText, scaffoldText, opts).then(function(image) {
                             if (image) {
-                                var pngDiv = document.getElementById('molSvg');
+                                var pngDiv = document.getElementById('molPng');
                                 if (typeof pngDiv === 'object') {
                                     console.log(image);
                                     pngDiv.innerHTML = '<img src="' + image + '" />';

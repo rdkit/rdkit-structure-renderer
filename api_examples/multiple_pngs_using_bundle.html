@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8" />
+        <title>StructureRenderer API example - generate multiple PNGs using bundle</title>
+    </head>
+    <body>
+        <script id="rendererBundle"></script>
+        <table>
+            <tbody>
+                <tr>
+                    <td>
+                        <img id="img1" />
+                    </td>
+                    <td>
+                        <img id="img2" />
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        <img id="img3" />
+                    </td>
+                    <td>
+                        <img id="img4" />
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+        <script>
+            var defaultDrawOpts = {
+                bondLineWidth: 0.7,
+                multipleBondOffset: 0.25,
+                baseFontSize: 1.0,
+                minFontSize: -1,
+                maxFontSize: -1,
+                annotationFontScale: 0.7,
+                highlightBondWidthMultiplier: 20,
+                dummyIsotopeLabels: false,
+                atomColourPalette: {
+                    0: [0.1, 0.1, 0.1],
+                    1: [0.0, 0.0, 0.0],
+                    6: [0.0, 0.0, 0.0],
+                    7: [0.0, 0.0, 1.0],
+                    8: [1.0, 0.0, 0.0],
+                    9: [0.0, 0.498, 0.0],
+                    15: [0.498, 0.0, 0.498],
+                    16: [0.498, 0.247, 0.0],
+                    17: [0.0, 0.498, 0.0],
+                    35: [0.0, 0.498, 0.0],
+                    53: [0.247, 0.0, 0.498],
+                },
+                backgroundColour: [1, 1, 1, 1],
+            };
+            var opts = {
+                format: 'base64png',
+                transparent: true,
+            };
+            function waitForRendererAvailable() {
+                const wait = function(resolve) {
+                    const POLL_INTERVAL = 50;
+                    const renderer = window.RDKitStructureRenderer;
+                    if (typeof renderer === 'object' && typeof renderer.init === 'function') {
+                        if (this.tid) {
+                            clearInterval(this.tid);
+                        }
+                        resolve(renderer.init());
+                    } else if (!this.tid) {
+                        this.tid = setInterval(function() {
+                            wait(resolve);
+                        }, POLL_INTERVAL);
+                    }
+                }
+                if (!this.promise) {
+                    this.promise = new Promise(wait);
+                }
+                return this.promise;
+            };
+            var unpkgRendererBundle = 'https://unpkg.com/rdkit-structure-renderer/dist/rdkit-structure-renderer-bundle.js';
+            var unpkgMinimalLibPath = 'https://unpkg.com/rdkit-structure-renderer/public';
+            var rendererBundle = document.getElementById('rendererBundle');
+            if (typeof rendererBundle === 'object') {
+                rendererBundle.src = unpkgRendererBundle;
+                rendererBundle.onload = function() {
+                    var renderer = window.RDKitStructureRenderer;
+                    renderer.getDefaultDrawOpts = function() { return defaultDrawOpts; };
+                    // The following requests to spawn a single Web Worker
+                    renderer.getMaxConcurrency = function() { return 1; };
+                    renderer.init(unpkgMinimalLibPath);
+                }
+            }
+
+            var smiArray = [
+                "C1CC1N2C=C(C(=O)C3=CC(=C(C=C32)N4CCNCC4)F)C(=O)O",
+                "O=C(O)\C2=C\N(c1cc(c(F)cc1C2=O)N3CCNCC3)CC",
+                "C[C@H]1COc2c3n1cc(c(=O)c3cc(c2N4CCN(CC4)C)F)C(=O)O",
+                "COc1c2c(cc(c1N3C[C@@H]4CCCN[C@@H]4C3)F)c(=O)c(cn2C5CC5)C(=O)O"
+            ];
+            smiArray.forEach(function(smi, i) {
+                var img = document.getElementById(`img${i + 1}`);
+                waitForRendererAvailable().then(function(r) {
+                    r. getImageFromMolText(smi, null, {
+                        ...opts,
+                        width: 300,
+                        height: 200,
+                    }).then(function(image) {
+                        if (image) {
+                            img.src = image;
+                        }
+                    });
+                });
+            })
+        </script>
+    </body>
+</html>

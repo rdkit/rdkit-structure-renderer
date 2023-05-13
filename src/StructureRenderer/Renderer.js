@@ -1649,7 +1649,7 @@ const Renderer = {
      * @returns {boolean} whether useMolBlockWedging should be set to true
      */
     shouldUseMolBlockWedging: (mol, userOpts) => {
-        if (!mol.has_coords() || userOpts.RECOMPUTE2D) {
+        if (mol.has_coords() !== 2 || userOpts.RECOMPUTE2D) {
             return false;
         }
         let shouldUse = userOpts.USE_MOLBLOCK_WEDGING;

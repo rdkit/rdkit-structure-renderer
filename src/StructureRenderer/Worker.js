@@ -60,7 +60,7 @@ const Depiction = {
             const molPickle = this.extractBase64Pickle(molText);
             return this.getMolFromUInt8Array(rdkitModule, molPickle);
         }
-        const FALLBACK_OPS = ['kekulize', 'sanitize'];
+        const FALLBACK_OPS = [{ kekulize: false }, { sanitize: false }, { query: true }];
         // this is called recursively until success
         // or until FALLBACK_OPS are available
         const _getMolSafe = (opIdxIn) => {
@@ -69,17 +69,26 @@ const Depiction = {
             let mol = null;
             const opts = getMolOpts || {};
             let op;
+            let shouldTry = true;
             if (typeof opIdx === 'number') {
-                op = FALLBACK_OPS[opIdx];
-                opts[op] = false;
+                shouldTry = false;
+                // eslint-disable-next-line prefer-destructuring
+                op = Object.entries(FALLBACK_OPS[opIdx])[0];
+                if (opts[op[0]] !== op[1]) {
+                    shouldTry = true;
+                    // eslint-disable-next-line prefer-destructuring
+                    opts[op[0]] = op[1];
+                }
             } else {
                 opIdx = -1;
             }
-            try {
-                mol = opts.query ? rdkitModule.get_qmol(molText)
-                    : rdkitModule.get_mol(molText, JSON.stringify(opts));
-            } catch (e) {
-                exc = ` (${e})`;
+            if (shouldTry) {
+                try {
+                    mol = opts.query ? rdkitModule.get_qmol(molText)
+                        : rdkitModule.get_mol(molText, JSON.stringify(opts));
+                } catch (e) {
+                    exc = ` (${e})`;
+                }
             }
             if (!mol?.is_valid()) {
                 if (mol) {
@@ -91,8 +100,8 @@ const Depiction = {
                     return _getMolSafe(opIdx);
                 }
                 console.error(`Failed to generate RDKit mol${exc}`);
-            } else if (op) {
-                console.error(`Failed to ${op} RDKit mol${exc}`);
+            } else if (op && op[0] !== 'query') {
+                console.warn(`Failed to ${op[0]} RDKit mol${exc}`);
             }
             return mol;
         };
@@ -115,16 +124,23 @@ const Depiction = {
             let res = null;
             const opts = getFragsOpts || {};
             let op;
+            let shouldTry = true;
             if (typeof opIdx === 'number') {
+                shouldTry = false;
                 op = FALLBACK_OPS[opIdx];
-                opts[op] = false;
+                if (opts[op] !== false) {
+                    shouldTry = true;
+                    opts[op] = false;
+                }
             } else {
                 opIdx = -1;
             }
-            try {
-                res = mol.get_frags(JSON.stringify(opts));
-            } catch (e) {
-                exc = ` (${e})`;
+            if (shouldTry) {
+                try {
+                    res = mol.get_frags(JSON.stringify(opts));
+                } catch (e) {
+                    exc = ` (${e})`;
+                }
             }
             if (!res) {
                 if (++opIdx < FALLBACK_OPS.length) {
@@ -263,21 +279,24 @@ const Depiction = {
         }
         if (mol) {
             try {
-                rebuild = !mol.has_coords();
+                const SANITIZE_FRAGS = { sanitizeFrags: false };
+                const molDim = mol.has_coords();
+                rebuild = !molDim;
                 const abbreviate = optsLocal.ABBREVIATE;
                 const { width, height } = drawOpts;
                 const canonicalizeDir = (typeof width === 'number'
                     && typeof height === 'number' && width < height ? -1 : 1);
+                const shouldWedge = !(molDim !== 2 || optsLocal.RECOMPUTE2D);
                 setBehavior({
                     MOL_NORMALIZE: true,
                     MOL_CANONICALIZE: rebuild || optsLocal.RECOMPUTE2D,
                     MOL_STRAIGHTEN: true,
-                    USE_MOLBLOCK_WEDGING: !(rebuild || optsLocal.RECOMPUTE2D),
+                    USE_MOLBLOCK_WEDGING: shouldWedge,
                 });
                 const normalize = behavior.MOL_NORMALIZE;
                 let straighten = behavior.MOL_STRAIGHTEN;
                 let canonicalize = (behavior.MOL_CANONICALIZE ? canonicalizeDir : 0);
-                useMolBlockWedging = !(rebuild || optsLocal.RECOMPUTE2D) && behavior.USE_MOLBLOCK_WEDGING;
+                useMolBlockWedging = shouldWedge && behavior.USE_MOLBLOCK_WEDGING;
                 switch (type) {
                 case 'c': {
                     rebuild = true;
@@ -308,110 +327,118 @@ const Depiction = {
                     // or a $$$$-separated string of molblocks. Each scaffold can in turn
                     // be constituted by mutliple disconnected fragments.
                     const scaffoldTextArray = this.splitScaffoldText(scaffoldText);
-                    const scaffoldIteratorArray = [];
-                    scaffoldTextArray.every((maybeMultiScaffoldText) => {
-                        let scaffold = this.getMolSafe(rdkitModule, maybeMultiScaffoldText, scaffoldOpts);
-                        if (scaffold && !scaffold.is_valid()) {
-                            scaffold.delete();
-                            scaffold = null;
-                        }
-                        if (!scaffold) {
-                            console.error('Failed to generate RDKit scaffold');
-                            return true;
-                        }
-                        const { molIterator } = this.getFragsSafe(scaffold);
-                        scaffold.delete();
-                        if (molIterator) {
-                            scaffoldIteratorArray.push(molIterator);
-                        }
-                        return true;
-                    });
-                    scaffoldIteratorArray.every((scaffoldIterator) => {
-                        while (!match && !scaffoldIterator.at_end()) {
-                            // scaffold is a single disconnected fragment
-                            const scaffold = scaffoldIterator.next();
-                            if (!scaffold) {
-                                break;
-                            }
-                            if (!scaffold.is_valid()) {
+                    const queryArray = (typeof scaffoldOpts.query === 'boolean'
+                        ? [scaffoldOpts.query] : [true, false]);
+                    queryArray.every((query) => {
+                        const scaffoldIteratorArray = [];
+                        scaffoldOpts.query = query;
+                        scaffoldTextArray.every((maybeMultiScaffoldText) => {
+                            let scaffold = this.getMolSafe(
+                                rdkitModule, maybeMultiScaffoldText, scaffoldOpts
+                            );
+                            if (scaffold && !scaffold.is_valid()) {
                                 scaffold.delete();
-                                continue;
+                                scaffold = null;
                             }
-                            let straightenScaffold = behavior.SCAFFOLD_STRAIGHTEN;
-                            let normalizeScaffold = behavior.SCAFFOLD_NORMALIZE;
-                            let canonicalizeScaffold = canonicalizeScaffoldStored;
-                            let minimizeScaffoldRotation = !behavior.SCAFFOLD_CANONICALIZE;
-                            let scaffoldHasCoords = scaffold.has_coords();
-                            // if scaffold has no coordinates we normalize it, canonicalize it
-                            // and straighten it fully unless user explicitly requested otherwise
-                            if (!scaffoldHasCoords) {
-                                if (isBehaviorAuto.SCAFFOLD_NORMALIZE) {
-                                    normalizeScaffold = true;
-                                }
-                                if (isBehaviorAuto.SCAFFOLD_CANONICALIZE) {
-                                    canonicalizeScaffold = canonicalizeDir;
-                                }
-                                if (isBehaviorAuto.SCAFFOLD_STRAIGHTEN) {
-                                    straightenScaffold = true;
-                                    minimizeScaffoldRotation = false;
-                                }
-                                scaffoldHasCoords = this.setNewCoords(scaffold, true);
-                                if (!scaffoldHasCoords) {
-                                    console.error('Failed to generate coordinates for scaffold - ignoring it');
-                                }
+                            if (!scaffold) {
+                                console.error('Failed to generate RDKit scaffold');
+                                return true;
                             }
-                            // if scaffold has coordinates but fails normalization we ignore it
-                            if (scaffoldHasCoords && normalizeScaffold
-                                && scaffold.normalize_depiction(canonicalizeScaffold) < 0.0) {
-                                console.error('Scaffold has bad coordinates - ignoring it');
-                                scaffoldHasCoords = false;
-                            }
-                            // if scaffold has coordinates, we align mol to it through either
-                            // a full CoordGen rebuild (alignOnly=false) or a rigid-body rotation
-                            // (alignOnly=true)
-                            if (scaffoldHasCoords) {
-                                if (straightenScaffold) {
-                                    scaffold.straighten_depiction(minimizeScaffoldRotation);
-                                }
-                                try {
-                                    match = JSON.parse(mol.generate_aligned_coords(scaffold, JSON.stringify({
-                                        useCoordGen: true,
-                                        allowRGroups: true,
-                                        acceptFailure: false,
-                                        alignOnly,
-                                    })) || null);
-                                } catch (e) {
-                                    console.error(`Exception in generate_aligned_coords (${e})`);
-                                }
-                            }
+                            const { molIterator } = this.getFragsSafe(scaffold, SANITIZE_FRAGS) || {};
                             scaffold.delete();
-                            // if there is a match and abbreviations were requested, the match
-                            // needs to be adjusted/pruned accordingly
-                            if (match && abbreviate) {
-                                try {
-                                    const molCopy = rdkitModule.get_mol_copy(mol);
-                                    const mapping = JSON.parse(molCopy.condense_abbreviations());
-                                    // eslint-disable-next-line no-loop-func
-                                    ['atoms', 'bonds'].forEach((k) => {
-                                        const invMapping = Array(mapping[k].reduce(
-                                            (prev, curr) => (curr > prev ? curr : prev), -1
-                                        ) + 1).fill(-1);
-                                        mapping[k].forEach((idx, pos) => {
-                                            invMapping[idx] = pos;
+                            if (molIterator) {
+                                scaffoldIteratorArray.push(molIterator);
+                            }
+                            return true;
+                        });
+                        scaffoldIteratorArray.every((scaffoldIterator) => {
+                            while (!match && !scaffoldIterator.at_end()) {
+                                // scaffold is a single disconnected fragment
+                                const scaffold = scaffoldIterator.next();
+                                if (!scaffold) {
+                                    break;
+                                }
+                                if (!scaffold.is_valid()) {
+                                    scaffold.delete();
+                                    continue;
+                                }
+                                let straightenScaffold = behavior.SCAFFOLD_STRAIGHTEN;
+                                let normalizeScaffold = behavior.SCAFFOLD_NORMALIZE;
+                                let canonicalizeScaffold = canonicalizeScaffoldStored;
+                                let minimizeScaffoldRotation = !behavior.SCAFFOLD_CANONICALIZE;
+                                let scaffoldHasCoords = scaffold.has_coords();
+                                // if scaffold has no coordinates we normalize it, canonicalize it
+                                // and straighten it fully unless user explicitly requested otherwise
+                                if (!scaffoldHasCoords) {
+                                    if (isBehaviorAuto.SCAFFOLD_NORMALIZE) {
+                                        normalizeScaffold = true;
+                                    }
+                                    if (isBehaviorAuto.SCAFFOLD_CANONICALIZE) {
+                                        canonicalizeScaffold = canonicalizeDir;
+                                    }
+                                    if (isBehaviorAuto.SCAFFOLD_STRAIGHTEN) {
+                                        straightenScaffold = true;
+                                        minimizeScaffoldRotation = false;
+                                    }
+                                    scaffoldHasCoords = this.setNewCoords(scaffold, true);
+                                    if (!scaffoldHasCoords) {
+                                        console.error('Failed to generate coordinates for scaffold - ignoring it');
+                                    }
+                                }
+                                // if scaffold has coordinates but fails normalization we ignore it
+                                if (scaffoldHasCoords && normalizeScaffold
+                                    && scaffold.normalize_depiction(canonicalizeScaffold) < 0.0) {
+                                    console.error('Scaffold has bad coordinates - ignoring it');
+                                    scaffoldHasCoords = false;
+                                }
+                                // if scaffold has coordinates, we align mol to it through either
+                                // a full CoordGen rebuild (alignOnly=false) or a rigid-body rotation
+                                // (alignOnly=true)
+                                if (scaffoldHasCoords) {
+                                    if (straightenScaffold) {
+                                        scaffold.straighten_depiction(minimizeScaffoldRotation);
+                                    }
+                                    try {
+                                        match = JSON.parse(mol.generate_aligned_coords(scaffold, JSON.stringify({
+                                            useCoordGen: true,
+                                            allowRGroups: true,
+                                            acceptFailure: false,
+                                            alignOnly,
+                                        })) || null);
+                                    } catch (e) {
+                                        console.error(`Exception in generate_aligned_coords (${e})`);
+                                    }
+                                }
+                                scaffold.delete();
+                                // if there is a match and abbreviations were requested, the match
+                                // needs to be adjusted/pruned accordingly
+                                if (match && abbreviate) {
+                                    try {
+                                        const molCopy = rdkitModule.get_mol_copy(mol);
+                                        const mapping = JSON.parse(molCopy.condense_abbreviations());
+                                        // eslint-disable-next-line no-loop-func
+                                        ['atoms', 'bonds'].forEach((k) => {
+                                            const invMapping = Array(mapping[k].reduce(
+                                                (prev, curr) => (curr > prev ? curr : prev), -1
+                                            ) + 1).fill(-1);
+                                            mapping[k].forEach((idx, pos) => {
+                                                invMapping[idx] = pos;
+                                            });
+                                            match[k] = match[k].filter(
+                                                (i) => invMapping[i] !== -1).map((j) => invMapping[j]
+                                            );
                                         });
-                                        match[k] = match[k].filter(
-                                            (i) => invMapping[i] !== -1).map((j) => invMapping[j]
-                                        );
-                                    });
-                                    molCopy.delete();
-                                } catch (e) {
-                                    console.error(`Failed to apply abbreviations (${e})`);
-                                    match = null;
+                                        molCopy.delete();
+                                    } catch (e) {
+                                        console.error(`Failed to apply abbreviations (${e})`);
+                                        match = null;
+                                    }
                                 }
                             }
-                        }
-                        scaffoldIterator.delete();
-                        // if there is a match we can quit the loop
+                            scaffoldIterator.delete();
+                            // if there is a match we can quit the loop
+                            return (match === null);
+                        });
                         return (match === null);
                     });
                     const rebuildStored = rebuild;

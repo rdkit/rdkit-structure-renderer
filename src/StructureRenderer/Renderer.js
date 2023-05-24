@@ -979,7 +979,7 @@ const Renderer = {
         const _write2DLayout = (mol, drawOpts, molDraw) => {
             let svg;
             if (typeof mol === 'object') {
-                if (!mol?.is_valid()) {
+                if (!mol) {
                     return null;
                 }
                 const drawOptsText = JSON.stringify(drawOpts);
@@ -1581,11 +1581,9 @@ const Renderer = {
             const mol = await this.getMolFromPickle(pickle);
             if (mol) {
                 try {
-                    if (mol.is_valid()) {
-                        const drawOpts = this.overrideDrawOpts(opts);
-                        this.resizeMolDraw(canvas, drawOpts.width, drawOpts.height, opts.scaleFac);
-                        return !!this.write2DLayout(mol, drawOpts, canvas);
-                    }
+                    const drawOpts = this.overrideDrawOpts(opts);
+                    this.resizeMolDraw(canvas, drawOpts.width, drawOpts.height, opts.scaleFac);
+                    return !!this.write2DLayout(mol, drawOpts, canvas);
                 } finally {
                     mol.delete();
                 }

@@ -159,11 +159,6 @@ const Utils = {
         } catch (e) {
             console.error(`Failed to generate mol from pickle (${e})`);
         }
-        if (mol && !mol.is_valid()) {
-            console.error('Failed to generate valid mol from pickle');
-            mol.delete();
-            mol = null;
-        }
         return mol;
     },
 

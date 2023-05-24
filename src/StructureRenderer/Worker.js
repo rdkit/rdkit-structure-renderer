@@ -90,11 +90,7 @@ const Depiction = {
                     exc = ` (${e})`;
                 }
             }
-            if (!mol?.is_valid()) {
-                if (mol) {
-                    mol.delete();
-                    mol = null;
-                }
+            if (!mol) {
                 while (++opIdx < FALLBACK_OPS.length && opts[FALLBACK_OPS[opIdx]]);
                 if (opIdx < FALLBACK_OPS.length) {
                     return _getMolSafe(opIdx);
@@ -336,10 +332,6 @@ const Depiction = {
                             let scaffold = this.getMolSafe(
                                 rdkitModule, maybeMultiScaffoldText, scaffoldOpts
                             );
-                            if (scaffold && !scaffold.is_valid()) {
-                                scaffold.delete();
-                                scaffold = null;
-                            }
                             if (!scaffold) {
                                 console.error('Failed to generate RDKit scaffold');
                                 return true;
@@ -356,10 +348,6 @@ const Depiction = {
                                 // scaffold is a single disconnected fragment
                                 const scaffold = scaffoldIterator.next();
                                 if (!scaffold) {
-                                    break;
-                                }
-                                if (!scaffold.is_valid()) {
-                                    scaffold.delete();
                                     continue;
                                 }
                                 let straightenScaffold = behavior.SCAFFOLD_STRAIGHTEN;

@@ -30,6 +30,11 @@ const config = {
             },
         ],
     },
+    output: {
+        path: path.resolve(__dirname, "dist"),
+        publicPath: ""
+    },
+    devtool: "source-map",
     plugins: [
         new DefinePlugin({
             PKG_VERSION: `'${version}'`,
@@ -59,8 +64,6 @@ module.exports = () => {
             outputModule: true,
         },
         output: {
-            path: path.resolve(__dirname, "dist"),
-            publicPath: "",
             filename: "rdkit-structure-renderer-module.js",
             library: {
                 type: "module",
@@ -77,8 +80,6 @@ module.exports = () => {
             ]
         },
         output: {
-            path: path.resolve(__dirname, "dist"),
-            publicPath: "",
             filename: "rdkit-structure-renderer-umd.js",
             library: {
                 type: "umd",
@@ -96,8 +97,6 @@ module.exports = () => {
         },
         target: ["web", "es5"],
         output: {
-            path: path.resolve(__dirname, "dist"),
-            publicPath: "",
             filename: "rdkit-structure-renderer-bundle.js",
         },
         devServer: {
@@ -126,8 +125,6 @@ module.exports = () => {
         },
         target: "node",
         output: {
-            path: path.resolve(__dirname, "dist"),
-            publicPath: "",
             filename: "rdkit-structure-renderer-node.js",
             libraryTarget: "commonjs2",
         },

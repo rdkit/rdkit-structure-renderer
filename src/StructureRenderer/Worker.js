@@ -105,10 +105,10 @@ const Depiction = {
     },
 
     /**
-     * Generate JSMolIterator from a JSMol potentially
+     * Generate JSMolList from a JSMol potentially
      * containing multiple disconnected fragments.
      * @param {JSMol} mol RDKit JSMol
-     * @returns {JSMolIterator} molecule iterator or null in case of failure
+     * @returns {JSMolList} molecule list or null in case of failure
      */
     getFragsSafe(mol, getFragsOpts) {
         const FALLBACK_OPS = ['sanitizeFrags'];
@@ -326,7 +326,7 @@ const Depiction = {
                     const queryArray = (typeof scaffoldOpts.query === 'boolean'
                         ? [scaffoldOpts.query] : [true, false]);
                     queryArray.every((query) => {
-                        const scaffoldIteratorArray = [];
+                        const scaffoldListArray = [];
                         scaffoldOpts.query = query;
                         scaffoldTextArray.every((maybeMultiScaffoldText) => {
                             let scaffold = this.getMolSafe(
@@ -336,17 +336,17 @@ const Depiction = {
                                 console.error('Failed to generate RDKit scaffold');
                                 return true;
                             }
-                            const { molIterator } = this.getFragsSafe(scaffold, SANITIZE_FRAGS) || {};
+                            const { molList } = this.getFragsSafe(scaffold, SANITIZE_FRAGS) || {};
                             scaffold.delete();
-                            if (molIterator) {
-                                scaffoldIteratorArray.push(molIterator);
+                            if (molList) {
+                                scaffoldListArray.push(molList);
                             }
                             return true;
                         });
-                        scaffoldIteratorArray.every((scaffoldIterator) => {
-                            while (!match && !scaffoldIterator.at_end()) {
+                        scaffoldListArray.every((scaffoldList) => {
+                            while (!match && !scaffoldList.at_end()) {
                                 // scaffold is a single disconnected fragment
-                                const scaffold = scaffoldIterator.next();
+                                const scaffold = scaffoldList.next();
                                 if (!scaffold) {
                                     continue;
                                 }
@@ -423,7 +423,7 @@ const Depiction = {
                                     }
                                 }
                             }
-                            scaffoldIterator.delete();
+                            scaffoldList.delete();
                             // if there is a match we can quit the loop
                             return (match === null);
                         });

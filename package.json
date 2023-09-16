@@ -1,6 +1,6 @@
 {
     "name": "rdkit-structure-renderer",
-    "version": "1.2.9",
+    "version": "1.2.12",
     "description": "A JS library to render molecules as HTML5 Canvas or SVG using RDKit MinimalLib",
     "main": "dist/rdkit-structure-renderer-umd.js",
     "scripts": {

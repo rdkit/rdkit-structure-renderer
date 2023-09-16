@@ -1064,7 +1064,7 @@ const Renderer = {
 
     /**
      * Override drawOpts where relevant, i.e. in relation to the
-     * value of specific userOpts, match, width, height, scaleFac,
+     * value of specific userOpts, match, width, height
      * transparency.
      * @param {Object|null} drawOpts input drawing options
      * @param {Object|null} userOpts user rendering options
@@ -1253,6 +1253,52 @@ const Renderer = {
     /**
      * Returns a { molblock, smiles, inchi } dictionary
      * containing the respective chemical representations
+     * associated to a given mol.
+     * @param {JSMol} mol
+     * @param {Array} formatsIn optional, array with formats that
+     * should be retrieved ('molblock', 'smiles', 'inchi')
+     * @param {object} userOpts user rendering options
+     * @returns {object} dictionary with chemical representations
+     */
+    async getChemFormatsFromMol(mol, formatsIn, userOpts) {
+        const formats = Array.isArray(formatsIn)
+            ? [...formatsIn] : ['molblock', 'smiles', 'inchi'];
+        const res = Object.fromEntries(formats.map((k) => [k, '']));
+        if (!mol) {
+            return res;
+        }
+        const useMolBlockWedging = this.shouldUseMolBlockWedging(mol, userOpts);
+        const molBlockParams = this.getMolblockParams(useMolBlockWedging);
+        if (res.molblock === '') {
+            res.molblock = Utils.getMolblockFromMol(mol, molBlockParams);
+        }
+        if (res.smiles === '' || res.inchi === '') {
+            try {
+                mol.remove_hs_in_place();
+            } catch (e) {
+                console.error(`Failed to remove Hs (${e})`);
+            }
+        }
+        if (res.smiles === '') {
+            try {
+                res.smiles = mol.get_smiles();
+            } catch (e) {
+                console.error(`Failed to generate SMILES (${e})`);
+            }
+        }
+        if (res.inchi === '') {
+            try {
+                res.inchi = mol.get_inchi();
+            } catch (e) {
+                console.error(`Failed to generate InChI (${e})`);
+            }
+        }
+        return res;
+    },
+
+    /**
+     * Returns a { molblock, smiles, inchi } dictionary
+     * containing the respective chemical representations
      * associated to a given mol pickle.
      * @param {UInt8Array} pickle
      * @param {Array} formatsIn optional, array with formats that
@@ -1261,36 +1307,17 @@ const Renderer = {
      * @returns {object} dictionary with chemical representations
      */
     async getChemFormatsFromPickle(pickle, formatsIn, userOpts) {
-        const formats = Array.isArray(formatsIn)
-            ? [...formatsIn] : ['molblock', 'smiles', 'inchi'];
-        const res = Object.fromEntries(formats.map((k) => [k, '']));
-        const mol = await this.getMolFromPickle(pickle);
-        if (mol) {
-            const useMolBlockWedging = this.shouldUseMolBlockWedging(mol, userOpts);
-            const molBlockParams = this.getMolblockParams(useMolBlockWedging);
-            if (res.molblock === '') {
-                res.molblock = Utils.getMolblockFromMol(mol, molBlockParams);
+        let mol;
+        try {
+            mol = await this.getMolFromPickle(pickle);
+        } catch (e) {
+            mol = null;
+        } finally {
+            if (mol) {
+                mol.delete();
             }
-            if (res.smiles === '' || res.inchi === '') {
-                mol.remove_hs_in_place();
-            }
-            if (res.smiles === '') {
-                try {
-                    res.smiles = mol.get_smiles();
-                } catch (e) {
-                    console.error(`Failed to generate SMILES (${e})`);
-                }
-            }
-            if (res.inchi === '') {
-                try {
-                    res.inchi = mol.get_inchi();
-                } catch (e) {
-                    console.error(`Failed to generate InChI (${e})`);
-                }
-            }
-            mol.delete();
         }
-        return res;
+        return this.getChemFormatsFromMol(mol, formatsIn, userOpts);
     },
 
     /**
@@ -1397,7 +1424,7 @@ const Renderer = {
                 const drawOpts = this.getDrawOpts(div || divId);
                 optsCopy.userOpts = { ...userOpts, ...optsCopy.userOpts };
                 optsCopy.drawOpts = { ...drawOpts, ...optsCopy.drawOpts };
-                res = this.getImageFromMol(mol, optsCopy);
+                res = await this.getImageFromMol(mol, optsCopy);
             } catch (e) {
                 console.error(`Failed to get image for ${divId} (${e})`);
             } finally {
@@ -1408,16 +1435,32 @@ const Renderer = {
     },
 
     /**
-     * Return the scaled blob.
-     * If scaleFac is null or 1, the input blob is returned unchanged.
+     * Return the scaled blob with added metadata if requested.
+     * If scaleFac is null or 1, and molAndMetadata is empty or null,
+     * the input blob is returned unchanged.
      * @param {Blob} blob input blob
      * @param {number} scaleFac (can be null)
-     * @returns Promise that resolves to scaled blob
+     * @param {object} molAndMetadata optional {mol, metadata} object (can be null)
+     * @returns Promise that resolves to mangled blob
      */
-    scaleBlob(blob, scaleFac) {
-        if (typeof blob !== 'object' || !blob.arrayBuffer
-            || typeof scaleFac !== 'number' || scaleFac <= 1) {
-            return Promise.resolve(blob);
+    async mangleBlob(blob, scaleFac, molAndMetadata) {
+        const isBinaryBlob = (typeof blob === 'object' && typeof blob.arrayBuffer === 'function');
+        const needScaling = (typeof scaleFac === 'number' && scaleFac > 1);
+        if (isBinaryBlob && molAndMetadata) {
+            const { mol, metadata } = molAndMetadata;
+            if (mol && metadata) {
+                try {
+                    const png = await blob.arrayBuffer();
+                    const pngWithMetadata = mol.add_to_png_blob(png, JSON.stringify(metadata));
+                    const { type } = blob;
+                    blob = new Blob([pngWithMetadata], { type });
+                } catch (e) {
+                    console.error(`Failed to add metadata to PNG image (${e})`);
+                }
+            }
+        }
+        if (!isBinaryBlob || !needScaling) {
+            return blob;
         }
         const dpi = NATIVE_CANVAS_RESOLUTION * scaleFac;
         return changeDpiBlob(blob, dpi);
@@ -1427,11 +1470,12 @@ const Renderer = {
      * Dumps the canvas content to a base64-encoded PNG string.
      * @param {Canvas|OffscreenCanvas} canvas
      * @param {number} scaleFac scaling factor (can be null)
+     * @param {object} molAndMetadata optional {mol, metadata} object (can be null)
      * @returns {Promise} promise that resolves to base64-encoded PNG
      * or null if error
      */
-    async toDataURL(canvas, scaleFac) {
-        const blob = await this.toBlob(canvas, scaleFac);
+    async toDataURL(canvas, scaleFac, molAndMetadata) {
+        const blob = await this.toBlob(canvas, scaleFac, molAndMetadata);
         if (!blob) {
             return Promise.resolve(null);
         }
@@ -1452,20 +1496,21 @@ const Renderer = {
      * Dumps the canvas content to a PNG Blob.
      * @param {Canvas|OffscreenCanvas} canvas
      * @param {number} scaleFac scaling factor (can be null)
+     * @param {object} molAndMetadata optional {mol, metadata} object (can be null)
      * @returns {Promise} Promise that resolves to PNG Blob
      */
-    toBlob(canvas, scaleFac) {
+    toBlob(canvas, scaleFac, molAndMetadata) {
         if (typeof canvas.toBlob === 'function') {
             return new Promise((resolve) => {
                 canvas.toBlob((img) => {
-                    resolve(this.scaleBlob(img, scaleFac));
+                    resolve(this.mangleBlob(img, scaleFac, molAndMetadata));
                 });
             });
         }
         if (typeof canvas.convertToBlob === 'function') {
-            return canvas.convertToBlob().then((img) => this.scaleBlob(img, scaleFac));
+            return canvas.convertToBlob().then((img) => this.mangleBlob(img, scaleFac, molAndMetadata));
         }
-        return null;
+        return Promise.resolve(null);
     },
 
     /**
@@ -1492,7 +1537,7 @@ const Renderer = {
         if (!mol) {
             return null;
         }
-        const { format, userOpts } = opts;
+        const { format, metadata, userOpts } = opts;
         let shouldReturnObject = false;
         const imageDict = {};
         let formatArray;
@@ -1505,6 +1550,7 @@ const Renderer = {
         if (userOpts?.ABBREVIATE) {
             mol.condense_abbreviations();
         }
+        const molAndMetadata = metadata ? { mol, metadata } : null;
         const scaleFac = opts.scaleFac || 1;
         const drawOpts = this.overrideDrawOpts(opts);
         if (formatArray.includes('svg')) {
@@ -1527,13 +1573,13 @@ const Renderer = {
                     this.resizeMolDraw(canvas, drawOpts.width, drawOpts.height, scaleFac);
                     if (this.write2DLayout(mol, drawOpts, canvas) !== null) {
                         if (formatArray.includes('base64png')) {
-                            imageDict.base64png = await this.toDataURL(canvas, scaleFac);
+                            imageDict.base64png = await this.toDataURL(canvas, scaleFac, molAndMetadata);
                             if (!imageDict.base64png) {
                                 console.error('Failed to generate base64-encoded PNG image');
                             }
                         }
                         if (formatArray.includes('png')) {
-                            imageDict.png = await this.toBlob(canvas, scaleFac);
+                            imageDict.png = await this.toBlob(canvas, scaleFac, molAndMetadata);
                             if (!imageDict.png) {
                                 console.error('Failed to generate binary PNG image');
                             }
@@ -1632,8 +1678,15 @@ const Renderer = {
             const svgRes = await this.requestSvg(uniqueId, pickle, { drawOpts, ...userOpts, molOpts });
             image = svgRes?.svg;
         } else {
-            const mol = await this.getMolFromPickle(pickle);
-            image = await this.getImageFromMol(mol, opts);
+            let mol;
+            try {
+                mol = await this.getMolFromPickle(pickle);
+                image = await this.getImageFromMol(mol, opts);
+            } finally {
+                if (mol) {
+                    mol.delete();
+                }
+            }
         }
         return image;
     },
@@ -1691,6 +1744,104 @@ const Renderer = {
     },
 
     /**
+     * Put a mol on the clipboard.
+     * @param {JSMol} mol
+     * @param {number|null} width image width
+     * @param {number|null} height image height
+     * @param {Object|null} match match object
+     * @param {Object|null} drawOpts input drawing options
+     * @param {Object|null} userOpts user rendering options
+     * @param {Array<string>} formats array of formats
+     * to be copied to clipboard ('png', 'svg', 'molblock', 'smiles', 'smiles_newline', 'base64png')
+     */
+    async putClipboardMol(mol, { width, height, match, drawOpts, userOpts, formats }) {
+        if (!mol) {
+            this.logClipboardError('No molecule to copy to clipboard');
+            return;
+        }
+        const content = {};
+        const clipboardDict = {};
+        const formatSet = new Set();
+        userOpts = userOpts || {};
+        let molblockToClipboard = false;
+        // svg, base64png and molblock are all text/plain, so we can't have all
+        // priority is svg > base64png > molblock
+        let plainTextIdx = -1;
+        ['svg', 'base64png', 'molblock'].every((fmt) => {
+            plainTextIdx = formats.indexOf(fmt);
+            return plainTextIdx === -1;
+        });
+        let needMolBlock = formats.includes('molblock');
+        if (formats.includes('png')) {
+            formatSet.add('png');
+            formatSet.add('base64png');
+            needMolBlock = true;
+        }
+        let molBlock;
+        if (needMolBlock) {
+            const useMolBlockWedging = this.shouldUseMolBlockWedging(mol, userOpts);
+            userOpts.USE_MOLBLOCK_WEDGING = useMolBlockWedging;
+            const molBlockParams = this.getMolblockParams(useMolBlockWedging);
+            molBlock = Utils.getMolblockFromMol(mol, molBlockParams);
+        }
+        const textFormat = (plainTextIdx !== -1 ? formats[plainTextIdx] : null);
+        if (textFormat) {
+            if (textFormat === 'molblock') {
+                clipboardDict[textFormat] = molBlock;
+                molblockToClipboard = true;
+            } else {
+                formatSet.add(textFormat);
+            }
+        }
+        if (formatSet.size) {
+            const format = Array.from(formatSet);
+            const scaleFac = this.copyImgScaleFac;
+            const metadata = {};
+            const opts = {
+                width,
+                height,
+                match,
+                format,
+                scaleFac,
+                drawOpts,
+                userOpts,
+                metadata,
+            };
+            Object.assign(clipboardDict, await this.getImageFromMol(mol, opts));
+        }
+        let msg = '';
+        Object.entries(clipboardDict).forEach(([fmt, image]) => {
+            if (image) {
+                const isBinaryImage = (typeof image !== 'string');
+                if (!isBinaryImage && !(fmt === 'base64png' && molblockToClipboard)) {
+                    const type = 'text/plain';
+                    const imageForClipboard = this.formatImageTextHtml(
+                        image, fmt, { width, height });
+                    content[type] = new Blob([imageForClipboard], { type });
+                } else if (isBinaryImage) {
+                    const type = 'image/png';
+                    const imageForClipboard = image;
+                    content[type] = new Blob([imageForClipboard], { type });
+                }
+                if (fmt === 'base64png') {
+                    const type = 'text/html';
+                    const imageForClipboard = this.formatImageTextHtml(
+                        image, fmt, { molBlock, width, height });
+                    content[type] = new Blob([imageForClipboard], { type });
+                }
+            } else {
+                msg += `Failed to generate ${fmt} image`;
+            }
+        });
+        if (msg) {
+            this.logClipboardError(msg);
+        }
+        if (Object.keys(content).length) {
+            this.putClipboardContent(content);
+        }
+    },
+
+    /**
      * Put some content from a given div on the clipboard.
      * @param {Element} div
      * @param {Array<string>} formats array of formats
@@ -1702,89 +1853,11 @@ const Renderer = {
         try {
             const drawOpts = this.getDrawOpts(div);
             const userOpts = this.getUserOptsForDiv(div);
+            const { width, height } = this.getRoundedDivSize(div);
             const key = this.getCacheKey(div);
             molMatch = await this.getMolAndMatchForKey(key) || {};
             const { mol, match } = molMatch;
-            if (!mol) {
-                this.logClipboardError();
-            } else {
-                const content = {};
-                const clipboardDict = {};
-                const formatSet = new Set();
-                let molblockToClipboard = false;
-                // svg, base64png and molblock are all text/plain, so we can't have all
-                // priority is svg > base64png > molblock
-                let plainTextIdx = -1;
-                ['svg', 'base64png', 'molblock'].every((fmt) => {
-                    plainTextIdx = formats.indexOf(fmt);
-                    return plainTextIdx === -1;
-                });
-                let needMolBlock = formats.includes('molblock');
-                if (formats.includes('png')) {
-                    formatSet.add('png');
-                    formatSet.add('base64png');
-                    needMolBlock = true;
-                }
-                let molBlock;
-                if (needMolBlock) {
-                    const useMolBlockWedging = this.shouldUseMolBlockWedging(mol, userOpts);
-                    userOpts.USE_MOLBLOCK_WEDGING = useMolBlockWedging;
-                    const molBlockParams = this.getMolblockParams(useMolBlockWedging);
-                    molBlock = Utils.getMolblockFromMol(mol, molBlockParams);
-                }
-                const textFormat = (plainTextIdx !== -1 ? formats[plainTextIdx] : null);
-                if (textFormat) {
-                    if (textFormat === 'molblock') {
-                        clipboardDict[textFormat] = molBlock;
-                        molblockToClipboard = true;
-                    } else {
-                        formatSet.add(textFormat);
-                    }
-                }
-                const format = Array.from(formatSet);
-                const { width, height } = this.getRoundedDivSize(div);
-                const scaleFac = this.copyImgScaleFac;
-                const opts = {
-                    width,
-                    height,
-                    match,
-                    format,
-                    scaleFac,
-                    drawOpts,
-                    userOpts,
-                };
-                Object.assign(clipboardDict, await this.getImageFromMol(mol, opts));
-                let msg = '';
-                Object.entries(clipboardDict).forEach(([fmt, image]) => {
-                    if (image) {
-                        const isBinaryImage = (typeof image !== 'string');
-                        if (!isBinaryImage && !(fmt === 'base64png' && molblockToClipboard)) {
-                            const type = 'text/plain';
-                            const imageForClipboard = this.formatImageTextHtml(
-                                image, fmt, { width, height });
-                            content[type] = Promise.resolve(new Blob([imageForClipboard], { type }));
-                        } else if (isBinaryImage) {
-                            const type = 'image/png';
-                            const imageForClipboard = image;
-                            content[type] = Promise.resolve(new Blob([imageForClipboard], { type }));
-                        }
-                        if (fmt === 'base64png') {
-                            const type = 'text/html';
-                            const imageForClipboard = this.formatImageTextHtml(
-                                image, fmt, { molBlock, width, height });
-                            content[type] = Promise.resolve(new Blob([imageForClipboard], { type }));
-                        }
-                    } else {
-                        msg += `Failed to generate ${fmt} image`;
-                    }
-                });
-                if (msg) {
-                    this.logClipboardError(msg);
-                }
-                if (Object.keys(content).length) {
-                    await this.putClipboardContent(content);
-                }
-            }
+            await this.putClipboardMol(mol, { width, height, match, drawOpts, userOpts, formats });
         } catch (e) {
             this.logClipboardError(`${e}`);
         } finally {

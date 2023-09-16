@@ -1308,16 +1308,16 @@ const Renderer = {
      */
     async getChemFormatsFromPickle(pickle, formatsIn, userOpts) {
         let mol;
+        let res;
         try {
             mol = await this.getMolFromPickle(pickle);
-        } catch (e) {
-            mol = null;
+            res = await this.getChemFormatsFromMol(mol, formatsIn, userOpts);
         } finally {
             if (mol) {
                 mol.delete();
             }
         }
-        return this.getChemFormatsFromMol(mol, formatsIn, userOpts);
+        return res;
     },
 
     /**

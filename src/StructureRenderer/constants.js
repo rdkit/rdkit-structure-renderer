@@ -102,6 +102,11 @@ const CLIPBOARD_OPTS = {
     name: 'clipboard-write',
     allowWithoutGesture: false,
 };
+const CLIPBOARD_TYPE = {
+    TEXT_PLAIN: 'text/plain',
+    TEXT_HTML: 'text/html',
+    IMAGE_PNG: 'image/png',
+}
 
 const WHL_OPTS = {
     SCALE: 0.3,
@@ -123,5 +128,6 @@ export {
     NO_MATCH,
     WAS_REBUILT,
     CLIPBOARD_OPTS,
+    CLIPBOARD_TYPE,
     WHL_OPTS,
 };

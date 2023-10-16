@@ -55,6 +55,7 @@ import {
     NO_MATCH,
     WAS_REBUILT,
     CLIPBOARD_OPTS,
+    CLIPBOARD_TYPE,
     WHL_OPTS,
 } from './constants';
 
@@ -1232,18 +1233,42 @@ const Renderer = {
      * Put content on the clipboard.
      * @param {object} content key: value dictionary containing
      * data (value) for each MIME type (key)
+     * @param {string|null} plainTextFallback optional plain text
+     * string to be copied to clipboard using the deprecated
+     * document.execCommand('copy') API
      * @returns {boolean} true if copy to clipboard succeeded, false
      * if it failed
      */
-    async putClipboardContent(content) {
+    async putClipboardContent(content, plainTextFallback) {
         // eslint-disable-next-line no-undef
         const item = new ClipboardItem(content);
         let res;
+        let e;
         try {
             await navigator.clipboard.write([item]);
             res = true;
         } catch (e) {
-            console.error('%O', e);
+            if (plainTextFallback) {
+                let tmpTextArea;
+                try {
+                    tmpTextArea = document.createElement('textarea');
+                    tmpTextArea.value = plainTextFallback;
+                    document.body.appendChild(tmpTextArea);
+                    tmpTextArea.select();
+                    res = document.execCommand('copy');
+                } catch (e) {
+                    // do nothing
+                } finally {
+                    if (tmpTextArea) {
+                        tmpTextArea.remove();
+                    }
+                }
+            }
+        }
+        if (!res) {
+            if (e) {
+                console.error('%O', e);
+            }
             this.logClipboardError('Failed to write content');
             res = false;
         }
@@ -1810,21 +1835,23 @@ const Renderer = {
             Object.assign(clipboardDict, await this.getImageFromMol(mol, opts));
         }
         let msg = '';
+        let plainTextFallback;
         Object.entries(clipboardDict).forEach(([fmt, image]) => {
             if (image) {
                 const isBinaryImage = (typeof image !== 'string');
                 if (!isBinaryImage && !(fmt === 'base64png' && molblockToClipboard)) {
-                    const type = 'text/plain';
+                    const type = CLIPBOARD_TYPE.TEXT_PLAIN;
                     const imageForClipboard = this.formatImageTextHtml(
                         image, fmt, { width, height });
+                    plainTextFallback = imageForClipboard;
                     content[type] = new Blob([imageForClipboard], { type });
                 } else if (isBinaryImage) {
-                    const type = 'image/png';
+                    const type = CLIPBOARD_TYPE.IMAGE_PNG;
                     const imageForClipboard = image;
                     content[type] = new Blob([imageForClipboard], { type });
                 }
                 if (fmt === 'base64png') {
-                    const type = 'text/html';
+                    const type = CLIPBOARD_TYPE.TEXT_HTML;
                     const imageForClipboard = this.formatImageTextHtml(
                         image, fmt, { molBlock, width, height });
                     content[type] = new Blob([imageForClipboard], { type });
@@ -1837,7 +1864,7 @@ const Renderer = {
             this.logClipboardError(msg);
         }
         if (Object.keys(content).length) {
-            this.putClipboardContent(content);
+            this.putClipboardContent(content, plainTextFallback);
         }
     },
 

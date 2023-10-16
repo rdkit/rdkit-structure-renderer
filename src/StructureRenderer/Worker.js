@@ -232,6 +232,8 @@ const Depiction = {
         drawOpts = drawOpts || {};
         molOpts = molOpts || {};
         scaffoldOpts = scaffoldOpts || {};
+        const { referenceSmarts } = scaffoldOpts;
+        delete scaffoldOpts.referenceSmarts;
         let rebuild = false;
         const pickle = new Uint8Array();
         let match = null;
@@ -392,6 +394,7 @@ const Depiction = {
                                             allowRGroups: true,
                                             acceptFailure: false,
                                             alignOnly,
+                                            referenceSmarts,
                                         })) || null);
                                     } catch (e) {
                                         console.error(`Exception in generate_aligned_coords (${e})`);

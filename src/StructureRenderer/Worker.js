@@ -31,6 +31,7 @@
 //
 
 import Utils from './utils';
+import { JOB_TYPES } from './constants';
 
 const {
     extractBase64Pickle,
@@ -38,7 +39,7 @@ const {
     getPickleSafe,
     isBase64Pickle,
     isMolBlock,
-    splitScaffoldText,
+    splitMolText,
 } = Utils;
 
 const Depiction = {
@@ -47,12 +48,14 @@ const Depiction = {
     getPickleSafe,
     isBase64Pickle,
     isMolBlock,
-    splitScaffoldText,
+    splitMolText,
 
     /**
      * Generate molecule from SMILES, CTAB or pkl_base64.
-     * @param {object}
+     * @param {object} rdkitModule
      * @param {string} molText SMILES, CTAB or pkl_base64
+     * @param {object} getMolOpts optional, dict of options
+     * passed to get_mol (defaults to {})
      * @returns {JSMol} molecule or null in case of failure
      */
     getMolSafe(rdkitModule, molText, getMolOpts) {
@@ -102,6 +105,69 @@ const Depiction = {
             return mol;
         };
         return _getMolSafe();
+    },
+
+    /**
+     * Generate JSMolList from a pipe-separated list of SMILES/pkl_base64 or
+     * '$$$$'-separated list of CTABs.
+     * @param {object} rdkitModule
+     * @param {string} molText mol description (SMILES, molblock or pkl_base64).
+     * The description may include multiple mols, either separated by a pipe symbol
+     * ('|', SMILES and pkl_base64) or by the SDF terminator ('$$$$', molblock).
+     * @param {object} getMolOpts optional, dict of options
+     * passed to get_mol (defaults to {})
+     * @returns {JSMolList} JSMolList or null in case of failure
+     */
+    getMolListSafe(rdkitModule, molText, getMolOpts) {
+        const molTextArray = this.splitMolText(molText);
+        const molArray = molTextArray.map(
+            (molText) => this.getMolSafe(rdkitModule, molText, getMolOpts)
+        );
+        return this.getMolListFromMolArray(rdkitModule, molArray);
+    },
+
+    /**
+     * Generate JSMolList from an array of UInt8Array representing
+     * pickled molecules.
+     * @param {Array<UInt8Array>} molArray array of pickled molecules
+     * @returns {JSMolList} JSMolList or null in case of failure
+     * or empty input array
+     */
+    getMolListFromUInt8ArrayArray(rdkitModule, molPickleArray) {
+        if (!Array.isArray(molPickleArray)) {
+            return null;
+        }
+        const molArray = molPickleArray.map(
+            (molPickle) => this.getMolFromUInt8Array(rdkitModule, molPickle)
+        );
+        return this.getMolListFromMolArray(rdkitModule, molArray);
+    },
+
+    /**
+     * Generate JSMolList from an array of JSMol.
+     * @param {Array<JSMol>} molArray array of JSMol
+     * @returns {JSMolList} JSMolList or null in case of failure
+     * or empty input array
+     */
+    getMolListFromMolArray(rdkitModule, molArray) {
+        if (!Array.isArray(molArray) || !molArray.length) {
+            return null;
+        }
+        const molList = new rdkitModule.MolList();
+        if (!molList) {
+            console.error(`Failed to initialize empty MolList`);
+            return null;
+        }
+        molArray.forEach((mol) => {
+            if (mol) {
+                try {
+                    molList.append(mol);
+                } finally {
+                    mol.delete();
+                }
+            }
+        });
+        return molList;
     },
 
     /**
@@ -222,27 +288,29 @@ const Depiction = {
     get({
         rdkitModule,
         type,
-        molText,
+        molDesc,
         scaffoldText,
-        molPickle,
         opts,
     }) {
         const optsLocal = opts || {};
-        let { drawOpts, molOpts, scaffoldOpts } = optsLocal;
+        let { drawOpts, molOpts, scaffoldOpts, mcsParams } = optsLocal;
         drawOpts = drawOpts || {};
         molOpts = molOpts || {};
         scaffoldOpts = scaffoldOpts || {};
+        mcsParams = mcsParams || {};
         const { referenceSmarts } = scaffoldOpts;
         delete scaffoldOpts.referenceSmarts;
         let rebuild = false;
         const pickle = new Uint8Array();
         let match = null;
         let svg = null;
+        let mcsResult = null;
         let useMolBlockWedging = null;
         const res = {
             pickle,
             match,
             svg,
+            mcsResult,
             rebuild,
             useMolBlockWedging,
         };
@@ -269,16 +337,20 @@ const Depiction = {
             });
         };
         if (type) {
-            if (molText) {
-                mol = this.getMolSafe(rdkitModule, molText, molOpts);
-            } else if (molPickle) {
-                mol = this.getMolFromUInt8Array(rdkitModule, molPickle);
+            if (typeof molDesc === 'string') {
+                mol = (type !== JOB_TYPES.GENERATE_MCS
+                    ? this.getMolSafe(rdkitModule, molDesc, molOpts)
+                    : this.getMolListSafe(rdkitModule, molDesc, molOpts));
+            } else {
+                mol = (type !== JOB_TYPES.GENERATE_MCS
+                    ? this.getMolFromUInt8Array(rdkitModule, molDesc)
+                    : this.getMolListFromUInt8ArrayArray(rdkitModule, molDesc));
             }
         }
         if (mol) {
             try {
                 const SANITIZE_FRAGS = { sanitizeFrags: false };
-                const molDim = mol.has_coords();
+                const molDim = (typeof mol.has_coords === 'function' ? mol.has_coords() : 0);
                 rebuild = !molDim;
                 const abbreviate = optsLocal.ABBREVIATE;
                 const { width, height } = drawOpts;
@@ -296,7 +368,7 @@ const Depiction = {
                 let canonicalize = (behavior.MOL_CANONICALIZE ? canonicalizeDir : 0);
                 useMolBlockWedging = shouldWedge && behavior.USE_MOLBLOCK_WEDGING;
                 switch (type) {
-                case 'c': {
+                case JOB_TYPES.COORDGEN_LAYOUT: {
                     rebuild = true;
                     useCoordGen = true;
                     Object.assign(res, this.getNormPickle(mol, {
@@ -304,7 +376,7 @@ const Depiction = {
                     }));
                     break;
                 }
-                case 'a': {
+                case JOB_TYPES.ALIGNED_LAYOUT: {
                     // if we need new coordinates, we use CoordGen to generate them
                     useCoordGen = optsLocal.RECOMPUTE2D;
                     setBehavior({
@@ -324,7 +396,7 @@ const Depiction = {
                     // scaffoldText can be a pipe-separated string of SMILES
                     // or a $$$$-separated string of molblocks. Each scaffold can in turn
                     // be constituted by mutliple disconnected fragments.
-                    const scaffoldTextArray = this.splitScaffoldText(scaffoldText);
+                    const scaffoldTextArray = this.splitMolText(scaffoldText);
                     const queryArray = (typeof scaffoldOpts.query === 'boolean'
                         ? [scaffoldOpts.query] : [true, false]);
                     queryArray.every((query) => {
@@ -453,13 +525,13 @@ const Depiction = {
                     res.wasRebuilt |= rebuildStored;
                     break;
                 }
-                case 'r': {
+                case JOB_TYPES.RDKIT_NATIVE_LAYOUT: {
                     Object.assign(res, this.getNormPickle(mol, {
                         rebuild, useCoordGen, normalize, canonicalize, straighten
                     }));
                     break;
                 }
-                case 's': {
+                case JOB_TYPES.GENERATE_SVG: {
                     if (abbreviate) {
                         mol.condense_abbreviations();
                     }
@@ -474,12 +546,20 @@ const Depiction = {
                     });
                     break;
                 }
+                case JOB_TYPES.GENERATE_MCS: {
+                    try {
+                        mcsResult = JSON.parse(rdkitModule.get_mcs(mol, JSON.stringify(mcsParams)));
+                    } catch (e) {
+                        console.error(`Failed to generate MCS (${e})`);
+                    }
+                    break;
+                }
                 default: {
                     console.error(`Unknown message type ${type}`);
                     break;
                 }
                 }
-                Object.assign(res, { match, svg, useMolBlockWedging });
+                Object.assign(res, { match, svg, mcsResult, useMolBlockWedging });
             } finally {
                 mol.delete();
             }

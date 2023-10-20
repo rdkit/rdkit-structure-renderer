@@ -56,6 +56,7 @@ import {
     WAS_REBUILT,
     CLIPBOARD_OPTS,
     WHL_OPTS,
+    JOB_TYPES,
 } from './constants';
 
 let _RDKitModule;
@@ -339,7 +340,7 @@ const Renderer = {
      */
     isRDKitReady() {
         if (!this._isRDKitReady) {
-            this._isRDKitReady = _RDKitModule && typeof _RDKitModule.version === 'function';
+            this._isRDKitReady = (_RDKitModule && typeof _RDKitModule.version === 'function');
         }
         return this._isRDKitReady;
     },
@@ -515,9 +516,6 @@ const Renderer = {
                             throw Error(`_loadRDKitModule: Failed to bootstrap ${this._minimalLibJs}`);
                         }
                         _window.initRDKitModule = undefined;
-                        // uncomment to have the RDKitModule available in console for debugging
-                        // _window.RDKitModule = _RDKitModule;
-                        // uncomment to have the Renderer available in console for debugging
                         _window.RDKitStructureRenderer = this;
                         _RDKitModule.use_legacy_stereo_perception(false);
                         console.log(`RDKit version: ${_RDKitModule.version()}`);
@@ -743,18 +741,18 @@ const Renderer = {
 
     /**
      * Request mol pickle for a given divId.
-     * @param {string} divId id of the div le molecule belongs to
-     * @param {string} molText molecule description (SMILES, molblock or pkl_base64)
+     * @param {string} divId id of the div the molecule belongs to
+     * @param {string} molDesc molecule description (SMILES, molblock or pkl_base64)
      * @param {string|null} scaffoldText scaffold description (SMILES, molblock or pkl_base64).
      * Note that the description may include multiple scaffolds, either separated by
      * a pipe symbol ('|', SMILES and pkl_base64) or by the SDF terminator ('$$$$', molblock).
      * @param {object} opts rendering options
-     * @returns {Promise} a Promise that will resolve to an object
+     * @returns {Promise<object>} a Promise that will resolve to an object
      * containing the mol pickle (and possibly other results depending on
      * the job type), or to null if the job is aborted before being submitted
      */
-    requestMolPickle(divId, molText, scaffoldText, opts) {
-        if (!molText) {
+    requestMolPickle(divId, molDesc, scaffoldText, opts) {
+        if (!molDesc) {
             return Promise.resolve({
                 pickle: null,
                 match: null,
@@ -763,16 +761,16 @@ const Renderer = {
                 useMolBlockWedging: null,
             });
         }
-        let type = 'r';
+        let type = JOB_TYPES.RDKIT_NATIVE_LAYOUT;
         if (scaffoldText) {
-            type = 'a';
+            type = JOB_TYPES.ALIGNED_LAYOUT;
         } else if (opts.RECOMPUTE2D) {
-            type = 'c';
+            type = JOB_TYPES.COORDGEN_LAYOUT;
         }
         return this.submit({
             divId,
             type,
-            molText,
+            molDesc,
             scaffoldText,
             opts,
         });
@@ -780,21 +778,42 @@ const Renderer = {
 
     /**
      * Request SVG for a given divId.
-     * @param {string} divId id of the div le molecule belongs to
-     * @param {UInt8Array} molPickle molecule description as pickle
+     * @param {string} divId id of the div the molecule belongs to
+     * @param {UInt8Array} molDesc molecule description as pickle
      * @param {object} opts rendering options
-     * @returns {string} a Promise that will resolve to an object containing
+     * @returns {Promise<string>} a Promise that will resolve to an object containing
      * the SVG when the job is completed, or to null
      * if the job is aborted before being submitted
      */
-    requestSvg(divId, molPickle, opts) {
-        const type = 's';
+    requestSvg(divId, molDesc, opts) {
+        const type = JOB_TYPES.GENERATE_SVG;
         return this.submit({
             divId,
             type,
-            molPickle,
+            molDesc,
             opts,
         });
+    },
+
+    /**
+     * Request MCS for a given divId.
+     * @param {string} divId id of the div the MCS belongs to
+     * @param {string|Array<UInt8Array>} molDesc molecule description as:
+     * 1. array of pickles
+     * 2. string constituted by a pipe-separated list of SMILES/pkl_base64 or
+     * '$$$$'-separated list of CTABs
+     * @returns {Promise<object|null>} a Promise that will resolve to a MCS result object,
+     * or to null if the job is aborted before being submitted
+     */
+    async requestMcs(divId, molDesc, mcsParams) {
+        const type = JOB_TYPES.GENERATE_MCS;
+        const res = await this.submit({
+            divId,
+            type,
+            molDesc,
+            opts: { mcsParams },
+        });
+        return res ? res.mcsResult : null;
     },
 
     /**
@@ -1017,7 +1036,7 @@ const Renderer = {
 
     /**
      * Request mol pickle for a given divId.
-     * @param {string} divId id of the div le molecule belongs to
+     * @param {string} divId id of the div the molecule belongs to
      * @param {string} molText molecule description (SMILES, molblock or pkl_base64)
      * @param {string|null} scaffoldText scaffold description (SMILES, molblock or pkl_base64).
      * Note that the description may include multiple scaffolds, either separated by

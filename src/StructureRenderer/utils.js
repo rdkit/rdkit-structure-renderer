@@ -244,13 +244,13 @@ const Utils = {
     },
 
     /**
-     * @param {string} scaffoldText scaffold description (SMILES, molblock or pkl_base64).
-     * The description may include multiple scaffolds, either separated by a pipe symbol
+     * @param {string} molText mol description (SMILES, molblock or pkl_base64).
+     * The description may include multiple mols, either separated by a pipe symbol
      * ('|', SMILES and pkl_base64) or by the SDF terminator ('$$$$', molblock).
-     * @returns {Array<string>} array of scaffold descriptions
+     * @returns {Array<string>} array of mol descriptions
      */
-    splitScaffoldText(scaffoldText) {
-        return scaffoldText.split(this.isMolBlock(scaffoldText) ? /\$\$\$\$\r?\n/ : '|');
+    splitMolText(molText) {
+        return molText.split(this.isMolBlock(molText) ? /\$\$\$\$\r?\n/ : '|');
     }
 };
 

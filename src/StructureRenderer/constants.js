@@ -109,6 +109,14 @@ const WHL_OPTS = {
     TIMEOUT: 500,
 };
 
+const JOB_TYPES = {
+    RDKIT_NATIVE_LAYOUT: 1,
+    COORDGEN_LAYOUT: 2,
+    ALIGNED_LAYOUT: 3,
+    GENERATE_SVG: 4,
+    GENERATE_MCS: 5.
+};
+
 export {
     DEFAULT_DRAW_OPTS,
     DEFAULT_MOL_OPTS,
@@ -124,4 +132,5 @@ export {
     WAS_REBUILT,
     CLIPBOARD_OPTS,
     WHL_OPTS,
+    JOB_TYPES,
 };

@@ -121,7 +121,7 @@ const Depiction = {
     getMolListSafe(rdkitModule, molText, getMolOpts) {
         const molTextArray = this.splitMolText(molText);
         const molArray = molTextArray.map(
-            (molText) => this.getMolSafe(rdkitModule, molText, getMolOpts)
+            (molTextItem) => this.getMolSafe(rdkitModule, molTextItem, getMolOpts)
         );
         return this.getMolListFromMolArray(rdkitModule, molArray);
     },
@@ -155,7 +155,7 @@ const Depiction = {
         }
         const molList = new rdkitModule.MolList();
         if (!molList) {
-            console.error(`Failed to initialize empty MolList`);
+            console.error('Failed to initialize empty MolList');
             return null;
         }
         molArray.forEach((mol) => {
@@ -255,9 +255,10 @@ const Depiction = {
      * @param {boolean} normalize whether coordinates should be normalized
      * @param {number} canonicalize 0: do not canonicalize, 1: X axis, -1: Y axis
      * @param {boolean} straighten whether depiction should be straightened
-     * @returns {object} object with two keys:
+     * @returns {object} object with three keys:
      * {
      *   pickle: Uint8Array; pickled molecule,
+     *   hasOwnCoords: boolean; true if the molecule has its own coordinates
      *   rebuild: boolean; true if the molecule coordinates were rebuilt
      * }
      */
@@ -265,9 +266,10 @@ const Depiction = {
         rebuild, useCoordGen, normalize, canonicalize, straighten
     }) {
         let pickle = '';
-        let hasCoords = mol.has_coords();
+        const hasOwnCoords = (mol.has_coords() === 2);
+        let hasCoords = hasOwnCoords;
         const scaleFac = (normalize ? -1.0 : 1.0);
-        let wasRebuilt = rebuild || !hasCoords;
+        let wasRebuilt = rebuild || !hasOwnCoords;
         if (wasRebuilt || mol.normalize_depiction(canonicalize, scaleFac) < 0.0) {
             wasRebuilt = true;
             hasCoords = this.setNewCoords(mol, useCoordGen);
@@ -293,7 +295,9 @@ const Depiction = {
         opts,
     }) {
         const optsLocal = opts || {};
-        let { drawOpts, molOpts, scaffoldOpts, mcsParams } = optsLocal;
+        let {
+            drawOpts, molOpts, scaffoldOpts, mcsParams
+        } = optsLocal;
         drawOpts = drawOpts || {};
         molOpts = molOpts || {};
         scaffoldOpts = scaffoldOpts || {};
@@ -306,6 +310,7 @@ const Depiction = {
         let svg = null;
         let mcsResult = null;
         let useMolBlockWedging = null;
+        let hasOwnCoords = null;
         const res = {
             pickle,
             match,
@@ -313,6 +318,7 @@ const Depiction = {
             mcsResult,
             rebuild,
             useMolBlockWedging,
+            hasOwnCoords,
         };
         let mol;
         let useCoordGen = false;
@@ -351,26 +357,31 @@ const Depiction = {
             try {
                 const SANITIZE_FRAGS = { sanitizeFrags: false };
                 const molDim = (typeof mol.has_coords === 'function' ? mol.has_coords() : 0);
-                rebuild = !molDim;
+                hasOwnCoords = (molDim === 2);
+                rebuild = (!hasOwnCoords || optsLocal.RECOMPUTE2D);
                 const abbreviate = optsLocal.ABBREVIATE;
                 const { width, height } = drawOpts;
                 const canonicalizeDir = (typeof width === 'number'
                     && typeof height === 'number' && width < height ? -1 : 1);
-                const shouldWedge = !(molDim !== 2 || optsLocal.RECOMPUTE2D);
                 setBehavior({
                     MOL_NORMALIZE: true,
-                    MOL_CANONICALIZE: rebuild || optsLocal.RECOMPUTE2D,
+                    MOL_CANONICALIZE: rebuild,
                     MOL_STRAIGHTEN: true,
-                    USE_MOLBLOCK_WEDGING: shouldWedge,
+                    USE_MOLBLOCK_WEDGING: !rebuild,
                 });
                 const normalize = behavior.MOL_NORMALIZE;
                 let straighten = behavior.MOL_STRAIGHTEN;
                 let canonicalize = (behavior.MOL_CANONICALIZE ? canonicalizeDir : 0);
-                useMolBlockWedging = shouldWedge && behavior.USE_MOLBLOCK_WEDGING;
                 switch (type) {
-                case JOB_TYPES.COORDGEN_LAYOUT: {
+                case JOB_TYPES.RDKIT_NATIVE_LAYOUT: {
+                    Object.assign(res, this.getNormPickle(mol, {
+                        rebuild, useCoordGen, normalize, canonicalize, straighten
+                    }));
+                    break;
+                }
+                case JOB_TYPES.REBUILD_LAYOUT: {
                     rebuild = true;
-                    useCoordGen = true;
+                    useCoordGen = !optsLocal.FORCE_RDKIT;
                     Object.assign(res, this.getNormPickle(mol, {
                         rebuild, useCoordGen, normalize, canonicalize, straighten
                     }));
@@ -378,7 +389,7 @@ const Depiction = {
                 }
                 case JOB_TYPES.ALIGNED_LAYOUT: {
                     // if we need new coordinates, we use CoordGen to generate them
-                    useCoordGen = optsLocal.RECOMPUTE2D;
+                    useCoordGen = !optsLocal.FORCE_RDKIT;
                     setBehavior({
                         SCAFFOLD_NORMALIZE: true,
                         SCAFFOLD_CANONICALIZE: false,
@@ -392,7 +403,7 @@ const Depiction = {
                     const canonicalizeScaffoldStored = behavior.SCAFFOLD_CANONICALIZE ? canonicalizeDir : 0;
                     match = null;
                     // if we do not recompute 2D coordinates, we only do a rigid-body rotation
-                    const alignOnly = !(optsLocal.RECOMPUTE2D || rebuild);
+                    const alignOnly = !rebuild;
                     // scaffoldText can be a pipe-separated string of SMILES
                     // or a $$$$-separated string of molblocks. Each scaffold can in turn
                     // be constituted by mutliple disconnected fragments.
@@ -403,7 +414,7 @@ const Depiction = {
                         const scaffoldListArray = [];
                         scaffoldOpts.query = query;
                         scaffoldTextArray.every((maybeMultiScaffoldText) => {
-                            let scaffold = this.getMolSafe(
+                            const scaffold = this.getMolSafe(
                                 rdkitModule, maybeMultiScaffoldText, scaffoldOpts
                             );
                             if (!scaffold) {
@@ -454,7 +465,7 @@ const Depiction = {
                                     scaffoldHasCoords = false;
                                 }
                                 // if scaffold has coordinates, we align mol to it through either
-                                // a full CoordGen rebuild (alignOnly=false) or a rigid-body rotation
+                                // a full rebuild (alignOnly=false) or a rigid-body rotation
                                 // (alignOnly=true)
                                 if (scaffoldHasCoords) {
                                     if (straightenScaffold) {
@@ -462,7 +473,7 @@ const Depiction = {
                                     }
                                     try {
                                         match = JSON.parse(mol.generate_aligned_coords(scaffold, JSON.stringify({
-                                            useCoordGen: true,
+                                            useCoordGen,
                                             allowRGroups: true,
                                             acceptFailure: false,
                                             alignOnly,
@@ -511,24 +522,16 @@ const Depiction = {
                         straighten = false;
                         canonicalize = 0;
                     } else {
-                        // if there is no match, we keep the original coordinates
-                        // unless user asked for a coordinate rebuild, in which
-                        // case we run a CoordGen rebuild with no scaffold
-                        useMolBlockWedging = false;
-                        if (opts.RECOMPUTE2D) {
-                            rebuild = true;
-                        }
+                        // if there is no match, we keep the original coordinates if any,
+                        // unless user asked for a coordinate rebuild
+                        // we only use CoordGen if RECOMPUTE2D is true and FORCE_RDKIT is false
+                        useCoordGen = (optsLocal.RECOMPUTE2D && !optsLocal.FORCE_RDKIT);
                     }
                     Object.assign(res, this.getNormPickle(mol, {
                         rebuild, useCoordGen, normalize, canonicalize, straighten
                     }));
-                    res.wasRebuilt |= rebuildStored;
-                    break;
-                }
-                case JOB_TYPES.RDKIT_NATIVE_LAYOUT: {
-                    Object.assign(res, this.getNormPickle(mol, {
-                        rebuild, useCoordGen, normalize, canonicalize, straighten
-                    }));
+                    rebuild = rebuildStored;
+                    res.wasRebuilt |= rebuild;
                     break;
                 }
                 case JOB_TYPES.GENERATE_SVG: {
@@ -547,10 +550,14 @@ const Depiction = {
                     break;
                 }
                 case JOB_TYPES.GENERATE_MCS: {
-                    try {
-                        mcsResult = JSON.parse(rdkitModule.get_mcs(mol, JSON.stringify(mcsParams)));
-                    } catch (e) {
-                        console.error(`Failed to generate MCS (${e})`);
+                    if (mol.size() > 1) {
+                        try {
+                            mcsResult = JSON.parse(rdkitModule.get_mcs_as_json(mol, JSON.stringify(mcsParams)));
+                        } catch (e) {
+                            console.error('Failed to generate MCS');
+                        }
+                    } else {
+                        console.error('Need >=2 molecules to generate MCS');
                     }
                     break;
                 }
@@ -559,7 +566,10 @@ const Depiction = {
                     break;
                 }
                 }
-                Object.assign(res, { match, svg, mcsResult, useMolBlockWedging });
+                useMolBlockWedging = !rebuild && behavior.USE_MOLBLOCK_WEDGING;
+                Object.assign(res, {
+                    match, svg, mcsResult, hasOwnCoords, useMolBlockWedging
+                });
             } finally {
                 mol.delete();
             }

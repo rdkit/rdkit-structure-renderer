@@ -30,7 +30,12 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-import { RDK_STR_RNR } from './constants';
+import {
+    RDK_STR_RNR,
+    OPT_TYPES,
+    LAYOUT_TYPES,
+    USER_OPTS
+} from './constants';
 import ButtonTooltip from './ButtonTooltip';
 import Utils from './utils';
 
@@ -50,6 +55,221 @@ class SettingsDialog {
         this.renderer = renderer;
         this._createDialog();
         this.currentDivId = null;
+    }
+
+    /**
+     * Build checkbox widget.
+     * @param {string} tag the tag associated to this checkbox
+     * @param {object} opt the object associated to this tag
+     * in USER_OPTS
+     * @returns the label element with associated checkbox
+     */
+    buildCheckBox(tag, opt) {
+        const label = document.createElement('label');
+        label.className = `${RDK_STR_RNR}checkbox`;
+        label.appendChild(document.createTextNode(opt.label));
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.id = `${RDK_STR_RNR}checkbox-${tag}`;
+        checkbox.onclick = () => this.onRenderingChanged(tag);
+        this.renderOpt[tag] = {
+            control: checkbox,
+            checked: () => checkbox.checked,
+            setChecked: (state) => {
+                checkbox.checked = state;
+            },
+        };
+        label.appendChild(checkbox);
+        if (opt.label.includes('scaffold')) {
+            label.onmouseenter = (e) => {
+                this.showHideScaffoldTooltip(e);
+            };
+            label.onmouseleave = (e) => {
+                this.showHideScaffoldTooltip(e);
+            };
+        }
+        this.scaffoldTooltip = new ButtonTooltip(this.renderer);
+        ['box', 'mark'].forEach((className) => {
+            const span = document.createElement('span');
+            span.className = className;
+            label.appendChild(span);
+        });
+        return label;
+    }
+
+    /**
+     * Add option to dropdown widget.
+     * @param {string} tag tag associated to the dropdown
+     * the option will be assigned to
+     * @param {HTMLElement} dropdown select Element that the
+     * option will be added to
+     * @param {object} optItem dropdown item as listed under
+     * the tag associated to this dropdown in USER_OPTS
+     * @param {HTMLELement} beforeNode optional, HTMLElement
+     * before which the option should be inserted. If falsy,
+     * the option will be appended to the existing ones
+     */
+    addDropdownOption(tag, dropdown, optItem, beforeNode) {
+        const { value } = optItem;
+        const option = document.createElement('option');
+        option.id = `${RDK_STR_RNR}dropdown-${tag}-${value}`;
+        option.value = value;
+        option.appendChild(document.createTextNode(optItem.label));
+        if (beforeNode) {
+            dropdown.insertBefore(option, beforeNode);
+        } else {
+            dropdown.appendChild(option);
+        }
+    }
+
+    /**
+     * Updates the selected option in the dropdown layout based
+     * on the RECOMPUTE2D, FORCE_RDKIT and SCAFFOLD_ALIGN boolean
+     * option status.
+     * The logic is:
+     * - if the molecule has original coordinates and RECOMPUTE2D is
+     *   false, original coordinates are used
+     * - otherwise, CoordGen layout is used if either RECOMPUTE2D or
+     *   SCAFFOLD_ALIGN are true, unless FORCE_RDKIT is also
+     *   true. If neither RECOMPUTE2D or SCAFFOLD_ALIGN are true,
+     *   or if FORCE_RDKIT is true, RDKit layout is used
+     * @param {HTMLELement} dropdown select Element that allows
+     * to switch the 2D layout among original, RDKit and CoordGen
+     */
+    updateLayoutDropdown(dropdown) {
+        const userOpts = this.renderer.getAvailUserOpts();
+        const recompute2d = this.renderOpt[userOpts.RECOMPUTE2D.tag].checked();
+        const forceRDKit = this.renderOpt[userOpts.FORCE_RDKIT.tag].checked();
+        const shouldAlign = this.renderOpt[userOpts.SCAFFOLD_ALIGN.tag].checked();
+        const hasRegisteredOption = (dropdown.children.length > 2);
+        let value = null;
+        if (!recompute2d && hasRegisteredOption) {
+            value = LAYOUT_TYPES.ORIGINAL;
+        }
+        if (value === null) {
+            value = (forceRDKit || (!shouldAlign && !recompute2d)
+                ? LAYOUT_TYPES.RDKIT : LAYOUT_TYPES.COORDGEN);
+        }
+        dropdown.value = value;
+    }
+
+    /**
+     * Build layout dropdown widget.
+     * For backwards compatibility, each option sets a combination
+     * of boolean options to the values specified under the "action" key
+     * @param {string} tag the tag associated to this widget
+     * @param {object} opt the object associated to this tag
+     * in USER_OPTS
+     * @returns the select element with options
+     */
+    buildLayoutDropdown(tag, opt) {
+        const dropdown = document.createElement('select');
+        dropdown.onclick = (e) => this.onDropdownClick.call(this, e, tag);
+        dropdown.onblur = () => this.setDropdownClosed.call(this);
+        const { renderOpt } = this;
+        renderOpt[tag] = {
+            control: dropdown,
+            currentValue: null,
+        };
+        const actions = {};
+        const associatedTagArray = [];
+        const updateLayoutDropdown = this.updateLayoutDropdown.bind(this);
+        opt.items.forEach((optItem) => {
+            const { value, action } = optItem;
+            this.addDropdownOption(tag, dropdown, optItem);
+            actions[value] = action;
+            Object.keys(action).forEach((k) => {
+                const t = Utils.keyToTag(k);
+                if (!renderOpt[t]?.control) {
+                    Object.assign(renderOpt, {
+                        [t]: {
+                            control: {
+                                checked: null,
+                            },
+                            checked() {
+                                return this.control.checked;
+                            },
+                            setChecked(state) {
+                                this.control.checked = state;
+                                updateLayoutDropdown(dropdown);
+                            },
+                        }
+                    });
+                    associatedTagArray.push(t);
+                }
+            });
+        });
+        const checked = () => associatedTagArray.map(
+            (t) => ({
+                tag: t,
+                checked: renderOpt[t].control.checked
+            })
+        );
+        const setChecked = (value) => {
+            Object.entries(actions[value]).forEach(
+                ([k, v]) => {
+                    const t = Utils.keyToTag(k);
+                    renderOpt[t].control.checked = v;
+                }
+            );
+        };
+        Object.assign(renderOpt[tag], { checked, setChecked });
+        const dropdownOuter = document.createElement('div');
+        dropdownOuter.className = `${RDK_STR_RNR}dropdown`;
+        const chevron = document.createElement('span');
+        chevron.className = 'chevron';
+        dropdownOuter.appendChild(chevron);
+        dropdownOuter.appendChild(dropdown);
+        return dropdownOuter;
+    }
+
+    /**
+     * Build widget (either checkbox or dropdown)
+     * @param {string} tag tag associated to this widget
+     * @param {object} opt the object associated to this tag
+     * in USER_OPTS
+     * @returns the HTMLElement associated to this widget
+     */
+    buildOptionWidget(tag, opt) {
+        const widgetBuildFunc = {
+            [OPT_TYPES.BOOL]: this.buildCheckBox.bind(this),
+            [OPT_TYPES.MULTIBOOL]: this.buildLayoutDropdown.bind(this),
+        };
+        return widgetBuildFunc[opt.type](tag, opt);
+    }
+
+    /**
+     * Toggle the "open" state of the dropdown.
+     */
+    toggleIsDropdownOpen() {
+        this.isDropdownOpen = !this.isDropdownOpen;
+    }
+
+    /**
+     * Set the dropdown state to "closed".
+     */
+    setDropdownClosed() {
+        this.isDropdownOpen = false;
+    }
+
+    /**
+     * This is called when a dropdown option is selected.
+     * If the selected option has changed, the associated
+     * boolean options are updated and the relevant rendering
+     * changes are applied.
+     * @param {Event} e the Event object associated to the
+     * dropdown click
+     * @param {string} tag the tag associated to this dropdown
+     */
+    onDropdownClick(e, tag) {
+        this.toggleIsDropdownOpen();
+        const { value } = e.target;
+        const { currentValue } = this.renderOpt[tag];
+        if (currentValue && value !== currentValue) {
+            this.renderOpt[tag].setChecked(value);
+            this.onRenderingChanged(tag);
+        }
+        this.renderOpt[tag].currentValue = value;
     }
 
     /**
@@ -114,17 +334,29 @@ class SettingsDialog {
     }
 
     /**
-     * Fetch the checked status of the checkbox field
+     * Fetch the value of the control associated to tag
      * and store it in the cache.
-     * @param {string} field tag identifying the checkbox
-     * @returns {boolean} whether the checkbox is checked
+     * BOOL controls are associated to a single boolean value,
+     * while MULTIBOOL are associated to multiple boolean values.
+     * @param {string} tag tag identifying the checkbox
+     * @returns {Array<object>} Array of { tag: isChecked } objects
+     * which associate a boolean state to each tag.
      */
-    fetchAndStoreBoolOpt(field) {
-        const isChecked = this.renderOpt[field].checked;
-        // remember the user setting for this field/div
+    fetchAndStoreBoolOpt(tag) {
+        let checked = this.renderOpt[tag].checked();
+        if (!Array.isArray(checked)) {
+            checked = [{ tag, checked }];
+        }
+        // remember the user setting for this tag/div
         const key = this.renderer.getCacheKey(this.molDiv);
-        this.renderer.updateUserOptCache(key, field, isChecked);
-        return isChecked;
+        checked.forEach(({ tag: t, checked: c }) => {
+            const divValue = this.renderer.getDivOpt(this.molDiv, t);
+            const divValueIsBool = (typeof divValue === 'boolean');
+            if ((divValueIsBool && divValue !== c) || (!divValueIsBool && c)) {
+                this.renderer.updateUserOptCache(key, t, c);
+            }
+        });
+        return checked;
     }
 
     /**
@@ -177,17 +409,17 @@ class SettingsDialog {
     /**
      * Called when the user clicks on one of the
      * SettingsDialog checkboxes.
-     * @param {string} field the tag identifying the checkbox
+     * @param {string} tag the tag identifying the checkbox
      */
-    async onRenderingChanged(field) {
+    async onRenderingChanged(tag) {
         const div = this.molDiv;
         const divId = this.renderer.getDivId(div);
         const key = this.renderer.getCacheKey(div);
         const currentDiv = this.renderer.currentDivs().get(divId) || {};
-        const isChecked = this.fetchAndStoreBoolOpt(field);
+        const isCheckedArray = this.fetchAndStoreBoolOpt(tag);
         const userOpts = this.renderer.getAvailUserOpts();
         let func = () => null;
-        if (field === userOpts.SCAFFOLD_ALIGN.tag || field === userOpts.RECOMPUTE2D.tag) {
+        if (tag === userOpts.SCAFFOLD_ALIGN.tag || tag === userOpts.LAYOUT.tag) {
             func = this.enableCopyMolblock.bind(this);
         }
         // while the 2D layout is being recomputed, disable
@@ -203,13 +435,13 @@ class SettingsDialog {
             }
             this.renderer.clearCurrentMol(key);
             molblock = await this.renderer.draw(div, true);
-            this.enableScaffoldOpts(div);
+            this.enableLayoutOpts(div);
             // call the callback (if any) to signal
             // the upstream app that the user settings for this div have changed
             if (molblock) {
                 const { userOptsCallback } = currentDiv;
                 if (userOptsCallback) {
-                    userOptsCallback(divId, field, isChecked, molblock);
+                    userOptsCallback(divId, tag, isCheckedArray, molblock);
                 }
             }
         } finally {
@@ -229,7 +461,8 @@ class SettingsDialog {
         const { scaffoldTooltip } = this;
         if (e.type === 'mouseleave' && scaffoldTooltip.isVisible()) {
             scaffoldTooltip.hide();
-        } else if (e.type === 'mouseenter' && e.target && !scaffoldTooltip.isVisible()) {
+        } else if (e.type === 'mouseenter' && e.target
+            && !scaffoldTooltip.isVisible() && !this.isDropdownOpen) {
             scaffoldTooltip.show(e.target, {
                 x: -0.3 * e.target.getBoundingClientRect().width,
                 y: 0,
@@ -248,33 +481,12 @@ class SettingsDialog {
         this.coordDependentCopyButtons = ['molblock', 'png', 'svg'];
         const formats = this.dialog.querySelector(`div[class=${RDK_STR_RNR}formats]`);
         this.renderOpt = {};
-        // dynamically create a checkbox and the relative label
+        this.isDropdownOpen = false;
+        // dynamically create a checkbox/dropdown and the relative labels
         // for each user setting in USER_OPTS
-        this.renderer.getCheckableUserOpts().forEach(({ tag, text }) => {
-            const label = document.createElement('label');
-            label.className = `${RDK_STR_RNR}checkbox`;
-            label.appendChild(document.createTextNode(text));
-            const checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            checkbox.id = `${RDK_STR_RNR}checkbox-${tag}`;
-            checkbox.onclick = () => this.onRenderingChanged(tag);
-            this.renderOpt[tag] = checkbox;
-            label.appendChild(checkbox);
-            if (text.includes('scaffold')) {
-                label.onmouseenter = (e) => {
-                    this.showHideScaffoldTooltip(e);
-                };
-                label.onmouseleave = (e) => {
-                    this.showHideScaffoldTooltip(e);
-                };
-            }
-            this.scaffoldTooltip = new ButtonTooltip(this.renderer);
-            ['box', 'mark'].forEach((className) => {
-                const span = document.createElement('span');
-                span.className = className;
-                label.appendChild(span);
-            });
-            this.dialog.insertBefore(label, formats);
+        this.renderer.getInteractiveUserOpts().forEach(({ tag, opt }) => {
+            const optionWidget = this.buildOptionWidget(tag, opt);
+            this.dialog.insertBefore(optionWidget, formats);
         });
         this.isExpanded = this.dialog.querySelector(`input[id=${RDK_STR_RNR}formats-input]`);
         this.onCopy = this.onCopy.bind(this);
@@ -333,15 +545,16 @@ class SettingsDialog {
     }
 
     /**
-     * Enable scaffold-related options in the SettingsDialog
+     * Enable layout-related options in the SettingsDialog
      * for a given div. The fact that scaffold alignment/highlighting
-     * are enabled depends on:
-     * a) the availability of a scaffold definition
-     * b) the fact that the scaffold was not previously proven
+     * and original layout are enabled depends on:
+     * a) the availability of own 2D coords
+     * b) the availability of a scaffold definition
+     * c) the fact that the scaffold was not previously proven
      *    not to match the molecule associated to div
      * @param {Element} div
      */
-    enableScaffoldOpts(div) {
+    enableLayoutOpts(div) {
         const userOpts = this.renderer.getAvailUserOpts();
         const drawOpts = this.renderer.getDrawOpts(div);
         const scaffold = this.renderer.getScaffold(div);
@@ -362,18 +575,47 @@ class SettingsDialog {
                 text = 'No scaffold defined';
             }
             this.scaffoldTooltip.setText(text);
-            const control = this.renderOpt[tag];
-            control.checked = false;
+            const { control, setChecked } = this.renderOpt[tag];
+            setChecked(false);
             this.disableAction(control);
         };
         const enableAndMaybeCheck = (tag) => {
             this.scaffoldTooltip.setText(null);
-            const control = this.renderOpt[tag];
+            const { control, setChecked } = this.renderOpt[tag];
             if (control.hasAttribute('disabled')) {
                 const isChecked = this.renderer.getDivOpt(div, tag) || false;
-                control.checked = isChecked;
+                setChecked(isChecked);
             }
             this.enableAction(control);
+        };
+        const findLayoutItem = (control, tag, layoutType) => (
+            control.children.namedItem(`${RDK_STR_RNR}dropdown-${tag}-${layoutType}`)
+        );
+        const removeRegisteredLayoutAndSelectRDKitOrCoordGen = (tag) => {
+            const { control } = this.renderOpt[tag];
+            const registeredItem = findLayoutItem(control, tag, LAYOUT_TYPES.ORIGINAL);
+            if (registeredItem) {
+                registeredItem.remove();
+            }
+            this.updateLayoutDropdown(control);
+        };
+        const addAndMaybeSelectRegisteredLayout = (tag) => {
+            const { control } = this.renderOpt[tag];
+            const registeredItem = findLayoutItem(control, tag, LAYOUT_TYPES.ORIGINAL);
+            if (!registeredItem) {
+                const optItem = USER_OPTS.LAYOUT.items.find(
+                    (item) => (item.value === LAYOUT_TYPES.ORIGINAL)
+                );
+                if (optItem) {
+                    this.addDropdownOption(
+                        tag,
+                        control,
+                        optItem,
+                        findLayoutItem(control, tag, LAYOUT_TYPES.RDKIT)
+                    );
+                }
+            }
+            this.updateLayoutDropdown(control);
         };
         const alignAction = canAlign ? enableAndMaybeCheck : disableAndUncheck;
         const highlightAction = canAlign
@@ -381,12 +623,12 @@ class SettingsDialog {
             || (drawOpts.bonds && Array.isArray(drawOpts.bonds) && drawOpts.bonds.length)
             ? enableAndMaybeCheck : disableAndUncheck;
         alignAction(userOpts.SCAFFOLD_ALIGN.tag);
-        // if the molecule coordinates were rebuilt ahead of the
-        // alignment, recompute2D would do nothing, so we disable it
-        const shouldAlign = this.renderOpt[userOpts.SCAFFOLD_ALIGN.tag].checked;
-        const recompute2DAction = shouldAlign && this.renderer.getWasRebuilt(key)
-            ? disableAndUncheck : enableAndMaybeCheck;
-        recompute2DAction(userOpts.RECOMPUTE2D.tag);
+        // if the molecule does not have its own coordinates,
+        // we remove the "original" option, otherwise we
+        // make sure it is available
+        const layoutAction = this.renderer.getHasOwnCoords(key)
+            ? addAndMaybeSelectRegisteredLayout : removeRegisteredLayoutAndSelectRDKitOrCoordGen;
+        layoutAction(userOpts.LAYOUT.tag);
         highlightAction(userOpts.SCAFFOLD_HIGHLIGHT.tag);
     }
 
@@ -397,12 +639,13 @@ class SettingsDialog {
     async setMolDiv(div) {
         this.molDiv = div;
         const key = this.renderer.getCacheKey(div);
-        this.renderer.getCheckableUserOpts().forEach(
+        this.renderer.getBoolUserOpts().forEach(
             (opt) => {
-                this.renderOpt[opt.tag].checked = this.renderer.getDivOpt(div, opt.tag) || false;
+                const { tag } = opt;
+                this.renderOpt[tag].setChecked(this.renderer.getDivOpt(div, tag) || false);
             }
         );
-        this.enableScaffoldOpts(div);
+        this.enableLayoutOpts(div);
         const relatedNodes = this.renderer.getRelatedNodes(div);
         const dialogRelatives = Object.fromEntries(
             Object.entries(relatedNodes).map(([k, cssSelector]) => {

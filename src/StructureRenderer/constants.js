@@ -80,22 +80,78 @@ const BUTTON_TYPES = [
     }
 ];
 
+const OPT_TYPES = {
+    BOOL: 1,
+    MULTIBOOL: 2,
+};
+
+const LAYOUT_TYPES = {
+    ORIGINAL: 1,
+    RDKIT: 2,
+    COORDGEN: 3,
+};
+
 const USER_OPTS = {
-    RECOMPUTE2D: 'Re-compute 2D layout',
-    SCAFFOLD_ALIGN: 'Align to scaffold',
-    SCAFFOLD_HIGHLIGHT: 'Highlight scaffold',
-    ABBREVIATE: 'Abbreviate groups',
-    ATOM_IDX: 'Add atom indices',
-    MOL_NORMALIZE: null,
-    MOL_STRAIGHTEN: null,
-    MOL_CANONICALIZE: null,
-    SCAFFOLD_NORMALIZE: null,
-    SCAFFOLD_STRAIGHTEN: null,
-    SCAFFOLD_CANONICALIZE: null,
-    USE_MOLBLOCK_WEDGING: null,
+    LAYOUT: {
+        items: [{
+            value: LAYOUT_TYPES.ORIGINAL,
+            label: 'Original layout',
+            action: {
+                RECOMPUTE2D: false,
+                FORCE_RDKIT: false,
+            },
+        }, {
+            value: LAYOUT_TYPES.RDKIT,
+            label: 'RDKit layout',
+            action: {
+                RECOMPUTE2D: true,
+                FORCE_RDKIT: true,
+            },
+        }, {
+            value: LAYOUT_TYPES.COORDGEN,
+            label: 'CoordGen layout',
+            action: {
+                RECOMPUTE2D: true,
+                FORCE_RDKIT: false,
+            },
+        }],
+        type: OPT_TYPES.MULTIBOOL,
+    },
+    SCAFFOLD_ALIGN: {
+        label: 'Align to scaffold',
+        type: OPT_TYPES.BOOL,
+    },
+    SCAFFOLD_HIGHLIGHT: {
+        label: 'Highlight scaffold',
+        type: OPT_TYPES.BOOL,
+    },
+    ABBREVIATE: {
+        label: 'Abbreviate groups',
+        type: OPT_TYPES.BOOL,
+    },
+    ATOM_IDX: {
+        label: 'Add atom indices',
+        type: OPT_TYPES.BOOL,
+    },
+    RECOMPUTE2D: {
+        label: null,
+        type: OPT_TYPES.BOOL,
+    },
+    FORCE_RDKIT: {
+        label: null,
+        type: OPT_TYPES.BOOL,
+    },
+    MOL_NORMALIZE: {},
+    MOL_STRAIGHTEN: {},
+    MOL_CANONICALIZE: {},
+    SCAFFOLD_NORMALIZE: {},
+    SCAFFOLD_STRAIGHTEN: {},
+    SCAFFOLD_CANONICALIZE: {},
+    USE_MOLBLOCK_WEDGING: {},
 };
 
 const NO_MATCH = '_noMatch';
+const HAS_OWN_COORDS = '_hasCoords';
 const WAS_REBUILT = '_rebuilt';
 
 const CLIPBOARD_OPTS = {
@@ -111,10 +167,10 @@ const WHL_OPTS = {
 
 const JOB_TYPES = {
     RDKIT_NATIVE_LAYOUT: 1,
-    COORDGEN_LAYOUT: 2,
+    REBUILD_LAYOUT: 2,
     ALIGNED_LAYOUT: 3,
     GENERATE_SVG: 4,
-    GENERATE_MCS: 5.
+    GENERATE_MCS: 5,
 };
 
 export {
@@ -128,7 +184,10 @@ export {
     DIV_ATTRS,
     BUTTON_TYPES,
     USER_OPTS,
+    OPT_TYPES,
+    LAYOUT_TYPES,
     NO_MATCH,
+    HAS_OWN_COORDS,
     WAS_REBUILT,
     CLIPBOARD_OPTS,
     WHL_OPTS,

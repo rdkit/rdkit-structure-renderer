@@ -53,10 +53,12 @@ import {
     BUTTON_TYPES,
     USER_OPTS,
     NO_MATCH,
+    HAS_OWN_COORDS,
     WAS_REBUILT,
     CLIPBOARD_OPTS,
     WHL_OPTS,
     JOB_TYPES,
+    OPT_TYPES,
 } from './constants';
 
 let _RDKitModule;
@@ -253,7 +255,7 @@ const Renderer = {
     setAvailUserOpts(userOpts) {
         this._userOpts = Object.fromEntries(
             Object.entries(userOpts || this.getDefaultUserOpts()).map(
-                ([k, text]) => [k, { tag: Utils.keyToTag(k), text }]
+                ([k, opt]) => [k, { tag: Utils.keyToTag(k), opt }]
             ),
         );
     },
@@ -265,12 +267,13 @@ const Renderer = {
     getDefaultUserOpts: () => USER_OPTS,
 
     /**
-     * Get available user opts as a { key: { tag, text } } dictionary.
-     * @returns {object} a dictionary relating tag keys to a { tag, text }
-     * dictionary where tag is the HTML tag name and text is the label
-     * displayed in the SettingsDialog. If text is null, the entry is not
-     * displayed in the SettingsDialog, but can still be set programmatically
-     * through the HTML tag
+     * Get available user opts as a { key: { tag, opt } } dictionary.
+     * @returns {object} a dictionary relating tag keys to a { tag, opt }
+     * dictionary where tag is the HTML tag name and opt is the option
+     * displayed in the SettingsDialog.
+     * Options can be boolean or multi-choice. If opt.label is null, the entry
+     * is not displayed in the SettingsDialog, but can still be set
+     * programmatically through the HTML tag
      */
     getAvailUserOpts() {
         if (!this._userOpts) {
@@ -370,16 +373,29 @@ const Renderer = {
     },
 
     /**
-     * Return user opts that can be checked by the user.
-     * @returns {Array<object>} an array of { tag, text } dictionaries
+     * Return user opts that can be changed by the user.
+     * @returns {Array<object>} an array of { tag, opt } dictionaries
      */
-    getCheckableUserOpts() {
-        if (!this._checkableUserOpts) {
-            this._checkableUserOpts = Object.values(this.getAvailUserOpts()).filter(
-                ({ text }) => (text !== null)
+    getInteractiveUserOpts() {
+        if (!this._interactiveUserOpts) {
+            this._interactiveUserOpts = Object.values(this.getAvailUserOpts()).filter(
+                ({ opt }) => (opt.type && opt.label !== null)
             );
         }
-        return this._checkableUserOpts;
+        return this._interactiveUserOpts;
+    },
+
+    /**
+     * Return user opts that can be toggled.
+     * @returns {Array<object>} an array of { tag, opt } dictionaries
+     */
+    getBoolUserOpts() {
+        if (!this._boolUserOpts) {
+            this._boolUserOpts = Object.values(this.getAvailUserOpts()).filter(
+                ({ opt }) => (opt.type === OPT_TYPES.BOOL)
+            );
+        }
+        return this._boolUserOpts;
     },
 
     /**
@@ -757,6 +773,7 @@ const Renderer = {
                 pickle: null,
                 match: null,
                 svg: null,
+                hasOwnCoords: null,
                 wasRebuilt: null,
                 useMolBlockWedging: null,
             });
@@ -765,7 +782,7 @@ const Renderer = {
         if (scaffoldText) {
             type = JOB_TYPES.ALIGNED_LAYOUT;
         } else if (opts.RECOMPUTE2D) {
-            type = JOB_TYPES.COORDGEN_LAYOUT;
+            type = JOB_TYPES.REBUILD_LAYOUT;
         }
         return this.submit({
             divId,
@@ -802,6 +819,7 @@ const Renderer = {
      * 1. array of pickles
      * 2. string constituted by a pipe-separated list of SMILES/pkl_base64 or
      * '$$$$'-separated list of CTABs
+     * @param {object|null} mcsParams optional MCS parameters
      * @returns {Promise<object|null>} a Promise that will resolve to a MCS result object,
      * or to null if the job is aborted before being submitted
      */
@@ -1053,7 +1071,11 @@ const Renderer = {
         // the scaffoldText, we need an aligned layout + matches
         const userOpts = userOptsIn || {};
         if (userOpts.SCAFFOLD_ALIGN || userOpts.SCAFFOLD_HIGHLIGHT) {
-            promArray.push(this.requestMolPickle(divId, molText, scaffoldText, userOpts));
+            const FORCE_RDKIT = (userOpts.SCAFFOLD_ALIGN ? userOpts.FORCE_RDKIT : true);
+            promArray.push(this.requestMolPickle(divId, molText, scaffoldText, {
+                ...userOpts,
+                FORCE_RDKIT,
+            }));
         }
         // if the user does not want to align to a scaffoldText, we
         // need an unaligned layout
@@ -1061,7 +1083,7 @@ const Renderer = {
             promArray.push(this.requestMolPickle(divId, molText, null, {
                 ...userOpts,
                 SCAFFOLD_ALIGN: false,
-                SCAFFOLD_HIGHLIGHT: false,
+                SCAFFOLD_HIGHLIGHT: false
             }));
         }
         const resArray = await Promise.all(promArray);
@@ -1073,7 +1095,9 @@ const Renderer = {
             res = {
                 match: firstRes.match,
                 wasRebuilt: firstRes.wasRebuilt,
-                // pickle and useMolBlockWedging will always be from the last promise
+                // hasOwnCoords, useMolBlockWedging and pickle
+                // will always be from the last promise
+                hasOwnCoords: lastRes.hasOwnCoords,
                 useMolBlockWedging: lastRes.useMolBlockWedging,
                 pickle: lastRes.pickle,
             };
@@ -1171,7 +1195,7 @@ const Renderer = {
                     }) || {};
             }
             const {
-                pickle, match, wasRebuilt, useMolBlockWedging
+                pickle, match, hasOwnCoords, wasRebuilt, useMolBlockWedging
             } = res;
             userOpts.USE_MOLBLOCK_WEDGING = useMolBlockWedging || false;
             if (pickle) {
@@ -1182,6 +1206,11 @@ const Renderer = {
                     } else {
                         this.clearFailsMatch(key);
                     }
+                }
+                if (hasOwnCoords) {
+                    this.setHasOwnCoords(key);
+                } else {
+                    this.clearHasOwnCoords(key);
                 }
                 if (wasRebuilt) {
                     this.setWasRebuilt(key);
@@ -2128,15 +2157,15 @@ const Renderer = {
      * If no cached value exists, the value read from the div is returned.
      * If the div has no value, or a divId is passed, undefined is returned.
      * @param {Element|string} div div or divId
-     * @param {string} userOpt name of the user-defined option
+     * @param {string} tag name of the user-defined option
      * @returns {any} value if the value was found, undefined if the value
      * was not found
      */
-    getDivOpt(div, userOpt) {
+    getDivOpt(div, tag) {
         const key = this.getCacheKey(div);
-        let res = this.getCachedValue(key, userOpt);
+        let res = this.getCachedValue(key, tag);
         if (typeof res === 'undefined' && typeof div !== 'string') {
-            res = div.getAttribute(Utils.dataAttr(userOpt));
+            res = div.getAttribute(Utils.dataAttr(tag));
         }
         return this.toBool(res);
     },
@@ -2196,6 +2225,32 @@ const Renderer = {
     },
 
     /**
+     * Returns true if the given key has its own set of coordinates.
+     * @param {string} key cache key
+     * @returns {boolean} true if the given key has
+     * its own set of coordinates, false if not
+     */
+    getHasOwnCoords(key) {
+        return this.getCachedValue(key, HAS_OWN_COORDS);
+    },
+
+    /**
+     * Mark the given key as having its own set of coordinates.
+     * @param {string} key cache key
+     */
+    setHasOwnCoords(key) {
+        this.updateUserOptCache(key, HAS_OWN_COORDS, true);
+    },
+
+    /**
+     * Clear the 'has own coords' flag on the given key.
+     * @param {string} key cache key
+     */
+    clearHasOwnCoords(key) {
+        this.updateUserOptCache(key, HAS_OWN_COORDS, null);
+    },
+
+    /**
      * Returns true if the given key had to undergo coordinate
      * generation ahead of scaffold alignment (e.g., because
      * existing coordinates were corrupted or non-existing).
@@ -2211,7 +2266,6 @@ const Renderer = {
      * Mark the given key as having had its coordinate rebuilt
      * ahead of scaffold alignment.
      * @param {string} key cache key
-     * @param {string} scaffold scaffold definition (SMILES or CTAB)
      */
     setWasRebuilt(key) {
         this.updateUserOptCache(key, WAS_REBUILT, true);
@@ -2462,7 +2516,7 @@ const Renderer = {
     },
 
     /**
-     * Dictionary where user viualization preferences
+     * Dictionary where user visualization preferences
      * for each divId are stored.
      */
     userOptCache: {},

@@ -164,7 +164,7 @@ class SettingsDialog {
      */
     buildLayoutDropdown(tag, opt) {
         const dropdown = document.createElement('select');
-        dropdown.onclick = (e) => this.onDropdownClick.call(this, e, tag);
+        dropdown.onchange = (e) => this.onDropdownChange.call(this, e, tag);
         dropdown.onblur = () => this.setDropdownClosed.call(this);
         const { renderOpt } = this;
         renderOpt[tag] = {
@@ -261,11 +261,11 @@ class SettingsDialog {
      * dropdown click
      * @param {string} tag the tag associated to this dropdown
      */
-    onDropdownClick(e, tag) {
+    onDropdownChange(e, tag) {
         this.toggleIsDropdownOpen();
         const { value } = e.target;
         const { currentValue } = this.renderOpt[tag];
-        if (currentValue && value !== currentValue) {
+        if (!currentValue || value !== currentValue) {
             this.renderOpt[tag].setChecked(value);
             this.onRenderingChanged(tag);
         }

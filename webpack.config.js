@@ -40,7 +40,7 @@ const config = {
             PKG_VERSION: `'${version}'`,
             // MINIMALLIB_PATH is relative to the src/StructureRenderer directory,
             // which is where Renderer.js (which references MINIMALLIB_PATH) lives
-            MINIMALLIB_PATH: `'${path.join("..", "..", "public", `RDKit_minimal.${version}.js`)}'`,
+            MINIMALLIB_PATH: `'../../public/RDKit_minimal.${version}.js'`,
         }),
     ],
 };

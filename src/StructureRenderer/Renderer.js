@@ -54,7 +54,6 @@ import {
     USER_OPTS,
     NO_MATCH,
     HAS_OWN_COORDS,
-    WAS_REBUILT,
     CLIPBOARD_OPTS,
     WHL_OPTS,
     JOB_TYPES,
@@ -774,7 +773,6 @@ const Renderer = {
                 match: null,
                 svg: null,
                 hasOwnCoords: null,
-                wasRebuilt: null,
                 useMolBlockWedging: null,
             });
         }
@@ -875,7 +873,8 @@ const Renderer = {
     },
 
     /**
-     * Get current molecule coordinates and match for a given key.
+     * Get current molecule coordinates, match and useMolBlockWeging
+     * flag for a given key.
      * @param {string} key cache key
      * @returns {object|null} { pickle, match } dictionary for current mol
      */
@@ -899,13 +898,16 @@ const Renderer = {
      * @param {string} key cache key
      * @param {Uint8Array} pickle molecule pickle
      * @param {string} match scaffold match
+     * @param {boolean} useMolBlockWedging whether native molblock
+     * wedging should be used to depict this molecule
      */
-    setCurrentMol(key, pickle, match) {
+    setCurrentMol(key, { pickle, match, useMolBlockWedging }) {
         const cachedEntry = this.userOptCache[key];
         if (cachedEntry) {
             cachedEntry.currentMol = {
                 pickle,
                 match,
+                useMolBlockWedging,
             };
         }
     },
@@ -1094,7 +1096,6 @@ const Renderer = {
             const lastRes = resArray[resArray.length - 1];
             res = {
                 match: firstRes.match,
-                wasRebuilt: firstRes.wasRebuilt,
                 // hasOwnCoords, useMolBlockWedging and pickle
                 // will always be from the last promise
                 hasOwnCoords: lastRes.hasOwnCoords,
@@ -1195,11 +1196,11 @@ const Renderer = {
                     }) || {};
             }
             const {
-                pickle, match, hasOwnCoords, wasRebuilt, useMolBlockWedging
+                pickle, match, hasOwnCoords, useMolBlockWedging
             } = res;
             userOpts.USE_MOLBLOCK_WEDGING = useMolBlockWedging || false;
             if (pickle) {
-                this.setCurrentMol(key, pickle, match);
+                this.setCurrentMol(key, { pickle, match, useMolBlockWedging });
                 if (userOpts.SCAFFOLD_ALIGN || userOpts.SCAFFOLD_HIGHLIGHT) {
                     if (!match && scaffoldText) {
                         this.setFailsMatch(key, scaffoldText);
@@ -1211,11 +1212,6 @@ const Renderer = {
                     this.setHasOwnCoords(key);
                 } else {
                     this.clearHasOwnCoords(key);
-                }
-                if (wasRebuilt) {
-                    this.setWasRebuilt(key);
-                } else {
-                    this.clearWasRebuilt(key);
                 }
                 drawOpts = this.overrideDrawOpts({
                     drawOpts, userOpts, match, width, height, transparent
@@ -1357,8 +1353,9 @@ const Renderer = {
     },
 
     /**
-     * Returns a dictionary with the molecule and the scaffold
-     * match (if any) associated to the passed key.
+     * Returns a dictionary with the molecule, scaffold
+     * match (if any) and useMolBlockWedging flag
+     * associated to the passed key.
      * IMPORTANT: it is responsibility of the caller to call
      * delete() on the returned JSMol when done with it to
      * avoid leaking memory, as the garbage collector will NOT
@@ -1370,10 +1367,11 @@ const Renderer = {
         const currentMol = this.getCurrentMol(key);
         let res = null;
         if (currentMol) {
-            const { pickle, match } = currentMol;
+            const { pickle, match, useMolBlockWedging } = currentMol;
             res = {
                 mol: await this.getMolFromPickle(pickle),
                 match,
+                useMolBlockWedging,
             };
         }
         return res;
@@ -1433,15 +1431,15 @@ const Renderer = {
         let res = null;
         const divId = this.getFirstDivIdFromDivIdOrKey(divIdOrKey) || divIdOrKey;
         const key = this.getCacheKey(divId);
-        const { mol, match } = await this.getMolAndMatchForKey(key) || {};
+        const { mol, match, useMolBlockWedging } = await this.getMolAndMatchForKey(key) || {};
         if (mol) {
             try {
                 const optsCopy = { ...opts };
                 optsCopy.match = optsCopy.match || match;
                 const div = this.getMolDiv(divId);
                 const userOpts = this.getUserOptsForDiv(div || divId) || {};
-                const useMolBlockWedging = this.shouldUseMolBlockWedging(mol, userOpts);
-                userOpts.USE_MOLBLOCK_WEDGING = useMolBlockWedging;
+                userOpts.USE_MOLBLOCK_WEDGING = useMolBlockWedging
+                    && this.shouldUseMolBlockWedging(mol, userOpts);
                 const drawOpts = this.getDrawOpts(div || divId);
                 optsCopy.userOpts = { ...userOpts, ...optsCopy.userOpts };
                 optsCopy.drawOpts = { ...drawOpts, ...optsCopy.drawOpts };
@@ -1745,14 +1743,14 @@ const Renderer = {
      * to be copied to clipboard ('png', 'svg', 'molblock', 'base64png')
      */
     async putClipboardItem(div, formats) {
-        let molMatch = {};
+        let molMatchWedging = {};
         this.setButtonsEnabled(div, false);
         try {
             const drawOpts = this.getDrawOpts(div);
             const userOpts = this.getUserOptsForDiv(div);
             const key = this.getCacheKey(div);
-            molMatch = await this.getMolAndMatchForKey(key) || {};
-            const { mol, match } = molMatch;
+            molMatchWedging = await this.getMolAndMatchForKey(key) || {};
+            const { mol, match, useMolBlockWedging } = molMatchWedging;
             if (!mol) {
                 this.logClipboardError();
             } else {
@@ -1775,9 +1773,9 @@ const Renderer = {
                 }
                 let molBlock;
                 if (needMolBlock) {
-                    const useMolBlockWedging = this.shouldUseMolBlockWedging(mol, userOpts);
-                    userOpts.USE_MOLBLOCK_WEDGING = useMolBlockWedging;
-                    const molBlockParams = this.getMolblockParams(useMolBlockWedging);
+                    userOpts.USE_MOLBLOCK_WEDGING = useMolBlockWedging
+                        && this.shouldUseMolBlockWedging(mol, userOpts);
+                    const molBlockParams = this.getMolblockParams(userOpts.USE_MOLBLOCK_WEDGING);
                     molBlock = Utils.getMolblockFromMol(mol, molBlockParams);
                 }
                 const textFormat = (plainTextIdx !== -1 ? formats[plainTextIdx] : null);
@@ -1836,8 +1834,8 @@ const Renderer = {
         } catch (e) {
             this.logClipboardError(`${e}`);
         } finally {
-            if (molMatch.mol) {
-                molMatch.mol.delete();
+            if (molMatchWedging.mol) {
+                molMatchWedging.mol.delete();
             }
             this.setButtonsEnabled(div, true);
         }
@@ -2248,35 +2246,6 @@ const Renderer = {
      */
     clearHasOwnCoords(key) {
         this.updateUserOptCache(key, HAS_OWN_COORDS, null);
-    },
-
-    /**
-     * Returns true if the given key had to undergo coordinate
-     * generation ahead of scaffold alignment (e.g., because
-     * existing coordinates were corrupted or non-existing).
-     * @param {string} key cache key
-     * @returns {boolean} true if the given key had to undergo
-     * coordinate generation ahead of alignment, false if not
-     */
-    getWasRebuilt(key) {
-        return this.getCachedValue(key, WAS_REBUILT);
-    },
-
-    /**
-     * Mark the given key as having had its coordinate rebuilt
-     * ahead of scaffold alignment.
-     * @param {string} key cache key
-     */
-    setWasRebuilt(key) {
-        this.updateUserOptCache(key, WAS_REBUILT, true);
-    },
-
-    /**
-     * Clear the 'was rebuilt' flag on the given key.
-     * @param {string} key cache key
-     */
-    clearWasRebuilt(key) {
-        this.updateUserOptCache(key, WAS_REBUILT, null);
     },
 
     /**

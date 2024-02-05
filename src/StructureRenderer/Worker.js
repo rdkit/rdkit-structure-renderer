@@ -284,7 +284,7 @@ const Depiction = {
             }
             pickle = this.getPickleSafe(mol);
         }
-        return { pickle, wasRebuilt };
+        return { pickle };
     },
 
     get({
@@ -531,7 +531,6 @@ const Depiction = {
                         rebuild, useCoordGen, normalize, canonicalize, straighten
                     }));
                     rebuild = rebuildStored;
-                    res.wasRebuilt |= rebuild;
                     break;
                 }
                 case JOB_TYPES.GENERATE_SVG: {

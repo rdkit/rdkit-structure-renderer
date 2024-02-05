@@ -152,7 +152,6 @@ const USER_OPTS = {
 
 const NO_MATCH = '_noMatch';
 const HAS_OWN_COORDS = '_hasCoords';
-const WAS_REBUILT = '_rebuilt';
 
 const CLIPBOARD_OPTS = {
     name: 'clipboard-write',
@@ -188,7 +187,6 @@ export {
     LAYOUT_TYPES,
     NO_MATCH,
     HAS_OWN_COORDS,
-    WAS_REBUILT,
     CLIPBOARD_OPTS,
     WHL_OPTS,
     JOB_TYPES,

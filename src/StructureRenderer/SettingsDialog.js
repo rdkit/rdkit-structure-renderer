@@ -151,6 +151,8 @@ class SettingsDialog {
                 ? LAYOUT_TYPES.RDKIT : LAYOUT_TYPES.COORDGEN);
         }
         dropdown.value = value;
+        this.renderOpt[userOpts.LAYOUT.tag].currentValue = value;
+
     }
 
     /**

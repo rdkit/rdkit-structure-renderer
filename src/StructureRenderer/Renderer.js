@@ -1174,10 +1174,10 @@ const Renderer = {
         // to the size of div
         const spinner = this.getSpinner(div);
         let molblock = '';
+        const userOpts = this.getUserOptsForDiv(div);
         const _asyncDraw = async (tid) => {
             // get the HTML element where we are going to draw
             const molDraw = this.getMolDraw(div);
-            const userOpts = this.getUserOptsForDiv(div);
             const molOpts = this.getMolOpts(div);
             const scaffoldOpts = this.getScaffoldOpts(div);
             let drawOpts = this.getDrawOpts(div);
@@ -1247,16 +1247,19 @@ const Renderer = {
             }
             const currentDiv = this.currentDivs().get(divId) || {};
             if (!currentDiv.childQueue) {
-                spinner.style.display = 'none';
+                spinner.style.display = (userOpts.SHOW_SPINNER === true ? 'block' : 'none');
             }
             if (tid) {
                 clearTimeout(tid);
             }
             return molblock;
         };
-        const tid = setTimeout(() => {
-            spinner.style.display = 'block';
-        }, this.getWhlOpts().TIMEOUT);
+        let tid;
+        if (userOpts.SHOW_SPINNER !== false) {
+            tid = setTimeout(() => {
+                spinner.style.display = 'block';
+            }, this.getWhlOpts().TIMEOUT);
+        }
         return _asyncDraw(tid);
     },
 
@@ -2403,7 +2406,7 @@ const Renderer = {
         let divId;
         if (typeof divOrDivId === 'object') {
             div = divOrDivId;
-            divId = div.id;
+            divId = this.getDivId(div);
         } else {
             divId = divOrDivId;
             div = this.getMolDiv(divId);
@@ -2477,9 +2480,11 @@ const Renderer = {
             seenDivKeys.add(divId);
         });
         // purge any div which is not mounted anymore from the cache
-        this.currentDivs().forEach((v, k) => {
-            if (!seenDivKeys.has(k)) {
-                this.currentDivs().delete(k);
+        this.currentDivs().forEach((_, divId) => {
+            if (!seenDivKeys.has(divId)) {
+                this.currentDivs().delete(divId);
+                const key = this.getCacheKey(divId);
+                this.decRef(key);
             }
         });
     },

@@ -2768,6 +2768,29 @@
                         </div>
                     </td>
                 </tr>
+                <tr>
+                    <th>
+                        Canvas toggle spinner every 5s
+                    </th>
+                    <th>
+                        Canvas toggle spinner every 5s
+                    </th>
+                </tr>
+                <tr>
+                    <td>
+                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-87"
+                            data-show-spinner="y"
+                            data-mol="CN1C(=O)CN=C(C2=C1C=CC(=C2)Cl)C3=CC=CC=C3">
+                        </div>
+                    </td>
+                    <td>
+                        <div class="rdk-str-rnr-mol-container structure" id="rdk-str-rnr-mol-88"
+                            data-show-spinner="y"
+                            data-mol="CN1C(=O)CN=C(C2=C1C=CC(=C2)Cl)C3=CC=CC=C3"
+                            data-use-svg>
+                        </div>
+                    </td>
+                </tr>
             </tbody>
         </table>
         <!-- Uncomment to load as module
@@ -2819,6 +2842,22 @@
                             });
                         } else {
                             r.updateMolDrawDivs();
+                        }
+                        var div87 = document.getElementById('rdk-str-rnr-mol-87');
+                        var div88 = document.getElementById('rdk-str-rnr-mol-88');
+                        if (div84 && div88) {
+                            setInterval(function() {
+                                [div87, div88].forEach(function(div) {
+                                    var spinnerState = div.getAttribute('data-show-spinner');
+                                    if (spinnerState && 'ty'.includes(spinnerState.substring(0, 1))) {
+                                        spinnerState = 'a';
+                                    } else {
+                                        spinnerState = 'y';
+                                    }
+                                    div.setAttribute('data-show-spinner', spinnerState);
+                                });
+                                r.updateMolDrawDivs();
+                            }, 5000)
                         }
                     });
                 }

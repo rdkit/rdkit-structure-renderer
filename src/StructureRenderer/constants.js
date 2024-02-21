@@ -148,6 +148,7 @@ const USER_OPTS = {
     SCAFFOLD_STRAIGHTEN: {},
     SCAFFOLD_CANONICALIZE: {},
     USE_MOLBLOCK_WEDGING: {},
+    SHOW_SPINNER: {},
 };
 
 const NO_MATCH = '_noMatch';

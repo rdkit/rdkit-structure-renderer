@@ -55,40 +55,21 @@
                 format: 'base64png',
                 transparent: true,
             };
-            function waitForRendererAvailable() {
-                const wait = function(resolve) {
-                    const POLL_INTERVAL = 50;
-                    const renderer = window.RDKitStructureRenderer;
-                    if (typeof renderer === 'object' && typeof renderer.init === 'function') {
-                        if (this.tid) {
-                            clearInterval(this.tid);
-                        }
-                        resolve(renderer.init());
-                    } else if (!this.tid) {
-                        this.tid = setInterval(function() {
-                            wait(resolve);
-                        }, POLL_INTERVAL);
-                    }
-                }
-                if (!this.promise) {
-                    this.promise = new Promise(wait);
-                }
-                return this.promise;
-            };
             var unpkgRendererBundle = 'https://unpkg.com/rdkit-structure-renderer/dist/rdkit-structure-renderer-bundle.js';
             var unpkgMinimalLibPath = 'https://unpkg.com/rdkit-structure-renderer/public';
-            var rendererBundle = document.getElementById('rendererBundle');
-            if (typeof rendererBundle === 'object') {
-                rendererBundle.src = unpkgRendererBundle;
-                rendererBundle.onload = function() {
-                    var renderer = window.RDKitStructureRenderer;
-                    renderer.getDefaultDrawOpts = function() { return defaultDrawOpts; };
-                    // The following requests to spawn a single Web Worker
-                    renderer.getMaxConcurrency = function() { return 1; };
-                    renderer.init(unpkgMinimalLibPath);
+            var rendererPromise = new Promise(function(resolve) {
+                var rendererBundle = document.getElementById('rendererBundle');
+                if (typeof rendererBundle === 'object') {
+                    rendererBundle.src = unpkgRendererBundle;
+                    rendererBundle.onload = function() {
+                        var renderer = window.RDKitStructureRenderer;
+                        renderer.getDefaultDrawOpts = function() { return defaultDrawOpts; };
+                        // The following requests to spawn a single Web Worker
+                        renderer.getMaxConcurrency = function() { return 1; };
+                        resolve(renderer.init(unpkgMinimalLibPath));
+                    }
                 }
-            }
-
+            });
             var smiArray = [
                 "C1CC1N2C=C(C(=O)C3=CC(=C(C=C32)N4CCNCC4)F)C(=O)O",
                 "O=C(O)\C2=C\N(c1cc(c(F)cc1C2=O)N3CCNCC3)CC",
@@ -97,8 +78,8 @@
             ];
             smiArray.forEach(function(smi, i) {
                 var img = document.getElementById(`img${i + 1}`);
-                waitForRendererAvailable().then(function(r) {
-                    r. getImageFromMolText(smi, null, {
+                rendererPromise.then(function(r) {
+                    r.getImageFromMolText(smi, null, {
                         ...opts,
                         width: 300,
                         height: 200,

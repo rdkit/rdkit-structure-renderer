@@ -767,7 +767,7 @@ const Renderer = {
      * the job type), or to null if the job is aborted before being submitted
      */
     requestMolPickle(divId, molDesc, scaffoldText, opts) {
-        if (!molDesc) {
+        if (typeof molDesc !== 'string') {
             return Promise.resolve({
                 pickle: null,
                 match: null,

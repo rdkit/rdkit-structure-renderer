@@ -2,3 +2,5 @@ node_modules
 public/favicon.ico
 py
 *.tgz
+api_examples/*/
+index_*.html
